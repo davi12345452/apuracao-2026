@@ -13,6 +13,7 @@ import traceback
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
+from . import alertas
 from .db import DB
 from .painel import estado, registrar_hist
 
@@ -32,6 +33,18 @@ class Estado:
         self.lock = threading.Lock()
         self.t = 0.0
         self.corpo = b"{}"
+        self.ultimo: dict | None = None
+
+    def vigiar(self, intervalo: float = 60.0) -> None:
+        """Recalcula o estado sem depender do navegador e manda os avisos do Telegram."""
+        while True:
+            try:
+                self.get()
+                if self.ultimo:
+                    alertas.verificar(self.db, self.ultimo)
+            except Exception:  # noqa: BLE001 - aviso nunca derruba o servidor
+                self.db.log("aviso", "alertas: " + traceback.format_exc(limit=2))
+            time.sleep(intervalo)
 
     def get(self) -> bytes:
         with self.lock:
@@ -39,6 +52,7 @@ class Estado:
                 try:
                     est = estado(self.db)
                     registrar_hist(self.db, est)
+                    self.ultimo = est
                     self.corpo = json.dumps(est, ensure_ascii=False, default=_json).encode()
                 except Exception:  # noqa: BLE001 - mantém o último bom e registra
                     self.db.log("erro", "painel: " + traceback.format_exc(limit=3))
@@ -77,8 +91,12 @@ def handler(est: Estado):
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--porta", type=int, default=8000)
+    ap.add_argument("--sem-alertas", action="store_true", help="não manda avisos no Telegram (só a porta 8000 manda)")
     a = ap.parse_args(argv)
-    srv = ThreadingHTTPServer(("127.0.0.1", a.porta), handler(Estado(DB())))
+    est = Estado(DB())
+    if a.porta == 8000 and not a.sem_alertas:
+        threading.Thread(target=est.vigiar, daemon=True).start()
+    srv = ThreadingHTTPServer(("127.0.0.1", a.porta), handler(est))
     print(f"painel em http://127.0.0.1:{a.porta}")
     srv.serve_forever()
 

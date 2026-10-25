@@ -73,6 +73,19 @@ def _swing_hier(d, w, grupo, regiao, n_g, n_r, k=K_ENCOLHE):
     return _encolher(g_x, g_w, reg[reg_de_g], k), g_w
 
 
+LAMBDA_INCL = 200.0  # eleitores × fração²: com pouco eleitorado apurado a inclinação fica perto de 0
+
+
+def _inclinacao(y, x, w):
+    """Inclinação de y em x, mínimos quadrados ponderados com intercepto, encolhida para 0 (ridge)."""
+    sw = w.sum()
+    if sw <= 0:
+        return 0.0
+    xm, ym = (w * x).sum() / sw, (w * y).sum() / sw
+    b = (w * (x - xm) * (y - ym)).sum() / ((w * (x - xm) ** 2).sum() + LAMBDA_INCL)
+    return float(np.clip(b, -1.0, 1.0))
+
+
 def _alpha(u: Unidades, rep: np.ndarray, w: np.ndarray, n_r: int) -> np.ndarray:
     """α por região: s ≈ l + α·o, mínimos quadrados ponderados sem intercepto."""
     s = np.where(u.vv > 0, u.lula / np.where(u.vv > 0, u.vv, 1), 0)
@@ -113,11 +126,17 @@ def projetar(u: Unidades, n_boot: int = 300, seed: int = 0, tau: float | None = 
         r_comp = np.where(rep & (u.base_comp > 0), comp_obs / np.where(u.base_comp > 0, u.base_comp, 1), 1.0)
         r_val = np.where(rep & (u.base_valid > 0), val_obs / np.where(u.base_valid > 0, u.base_valid, 1), 1.0)
     w_est = np.where(rep, u.est, 0).astype(float)
-    rc_g, _ = _swing_hier(r_comp - 1, w_est, u.grupo, u.regiao, n_g, n_r, k=K_ENCOLHE * 1.3)
+    # a variação do comparecimento depende de quem é forte no lugar (no exterior de 2026 a abstenção caiu
+    # muito mais onde Lula é forte): inclinação em função da fatia de Lula na base, o resto segue o swing
+    # hierárquico por UF/país
+    xl = u.base_l - 0.5
+    ok_c = rep & (u.base_comp > 0)
+    incl = _inclinacao(r_comp - 1, xl, np.where(ok_c, w_est, 0.0))
+    rc_g, _ = _swing_hier(np.where(ok_c, r_comp - 1 - incl * xl, 0.0), w_est, u.grupo, u.regiao, n_g, n_r, k=K_ENCOLHE * 1.3)
     rv_g, _ = _swing_hier(r_val - 1, w, u.grupo, u.regiao, n_g, n_r)
 
     resto = np.clip(u.te - u.est, 0, None).astype(float)
-    comp_rest = np.where(rep, comp_obs, np.clip(u.base_comp * (1 + rc_g[u.grupo]), 0, 1))
+    comp_rest = np.where(rep, comp_obs, np.clip(u.base_comp * (1 + rc_g[u.grupo] + incl * xl), 0, 1))
     val_rest = np.where(rep, val_obs, np.clip(u.base_valid * (1 + rv_g[u.grupo]), 0, 1))
     c_rest = resto * comp_rest
     vv_rest = c_rest * val_rest
@@ -173,6 +192,7 @@ def projetar(u: Unidades, n_boot: int = 300, seed: int = 0, tau: float | None = 
         "abstencao_final_pct": float(100 * (1 - c_fin / u.te.sum())),
         "margem_votos": float(lula_fin - (vv_fin - lula_fin)),
         "tau": float(tau),
+        "comparecimento_inclinacao": incl,
         "swing_uf": {u.nomes_grupo[i] if u.nomes_grupo else str(i): float(100 * sw_g[i]) for i in range(n_g) if w_g[i] > 0},
     })
     if alpha is not None:

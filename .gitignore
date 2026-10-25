@@ -7,3 +7,4 @@ data/cache/
 data/*.log
 data/*.pid
 data/geo/
+data/alertas.json
