@@ -1,0 +1,9 @@
+.venv
+.git
+**/__pycache__
+.pytest_cache
+data
+!data/cidades_exterior.json
+!data/ensaio_2022.json
+tests
+scripts

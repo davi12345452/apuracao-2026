@@ -11,6 +11,8 @@ Uso: python -m apuracao.vigia   (é o que ./run.sh start liga)
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -31,6 +33,8 @@ ASCARIBE = "https://dados.ascaribe.tech/real/nacional.json"
 
 
 def notificar(titulo: str, msg: str) -> None:
+    if not shutil.which("osascript"):
+        return
     msg = msg.replace('"', "'")
     subprocess.run(["osascript", "-e", f'display notification "{msg}" with title "{titulo}" sound name "Glass"'],
                    capture_output=True, timeout=10)
@@ -54,7 +58,7 @@ class Vigia:
 
     # ---------- processos ----------
     def subir(self, nome: str) -> None:
-        log = open(RAIZ / "data" / f"{nome}.log", "a")
+        log = open(Path(os.environ.get("APURACAO_DATA", RAIZ / "data")) / f"{nome}.log", "a")
         self.subiu_em[nome] = time.monotonic()
         self.filhos[nome] = subprocess.Popen(["nice", "-n", "10", *PROCS[nome]], cwd=RAIZ, stdout=log, stderr=log)
 

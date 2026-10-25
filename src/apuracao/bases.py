@@ -6,6 +6,7 @@ Uso: python -m apuracao.bases [2022] [2026_1t]
 from __future__ import annotations
 
 import csv
+import os
 import sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
@@ -18,7 +19,7 @@ from .db import DB
 from .exterior import cliente
 from .oficial import ler_u
 
-CACHE = Path(__file__).resolve().parents[2] / "data" / "cache"
+CACHE = Path(os.environ.get("APURACAO_DATA", Path(__file__).resolve().parents[2] / "data")) / "cache"
 ZIP_CAND = "https://cdn.tse.jus.br/estatistica/sead/odsele/votacao_candidato_munzona/votacao_candidato_munzona_2022.zip"
 ZIP_DET = "https://cdn.tse.jus.br/estatistica/sead/odsele/detalhe_votacao_munzona/detalhe_votacao_munzona_2022.zip"
 CSV_CAND = "votacao_candidato_munzona_2022_BR.csv"

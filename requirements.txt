@@ -1,0 +1,6 @@
+# imagem Docker (no Mac: pip install -e . com o analise-urnas vizinho)
+numpy==2.5.4
+requests==2.34.2
+urllib3==2.8.0
+asn1tools==0.169.0
+tzdata

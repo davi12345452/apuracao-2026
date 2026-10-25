@@ -6,6 +6,7 @@ Uso: python -m apuracao.server [--porta 8000]
 from __future__ import annotations
 
 import argparse
+import os
 import json
 import threading
 import time
@@ -90,14 +91,17 @@ def handler(est: Estado):
 
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--porta", type=int, default=8000)
+    ap.add_argument("--porta", type=int, default=int(os.environ.get("PORT", 8000)))
+    ap.add_argument("--host", default=os.environ.get("APURACAO_HOST", "127.0.0.1"))
     ap.add_argument("--sem-alertas", action="store_true", help="não manda avisos no Telegram (só a porta 8000 manda)")
     a = ap.parse_args(argv)
     est = Estado(DB())
-    if a.porta == 8000 and not a.sem_alertas:
+    # avisos: por padrão só o servidor principal (porta 8000); APURACAO_ALERTAS=1/0 decide no container
+    alertas_on = os.environ.get("APURACAO_ALERTAS", "1" if a.porta == 8000 else "0") == "1"
+    if alertas_on and not a.sem_alertas:
         threading.Thread(target=est.vigiar, daemon=True).start()
-    srv = ThreadingHTTPServer(("127.0.0.1", a.porta), handler(est))
-    print(f"painel em http://127.0.0.1:{a.porta}")
+    srv = ThreadingHTTPServer((a.host, a.porta), handler(est))
+    print(f"painel em http://{a.host}:{a.porta}")
     srv.serve_forever()
 
 
