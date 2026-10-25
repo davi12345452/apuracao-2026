@@ -568,9 +568,9 @@ function cartaoFluxo(v) {
   ];
   const destinos = [{ rot: "Lula", v: dL, cor: "var(--lula)" }, { rot: "Flávio", v: dF, cor: "var(--flavio)" }];
   const escala = Math.max(1, ...[fontes, destinos].map((xs) => xs.filter((x) => x.v > 0).reduce((a, x) => a + x.v, 0)));
-  const barra = (xs) => `<div class="fx-barra">${xs.filter((x) => x.v > 0).map((x) =>
+  const barra = (xs) => `<div class="fl-barra">${xs.filter((x) => x.v > 0).map((x) =>
     `<i style="width:${(100 * x.v) / escala}%;background:${x.cor}" title="${esc(x.rot)}: ${fmtN(x.v)}"></i>`).join("")}</div>`;
-  const legenda = (xs) => `<div class="fx-leg">${xs.filter((x) => x.v !== 0).map((x) =>
+  const legenda = (xs) => `<div class="fl-leg">${xs.filter((x) => x.v !== 0).map((x) =>
     `<span><i style="background:${x.cor}"></i>${esc(x.rot)} <b>${x.v > 0 ? "+" : "−"}${fmtN(Math.abs(x.v))}</b></span>`).join("")}</div>`;
   const fatiaAntes = (100 * v.lula_antes) / Math.max(1, v.lula_antes + v.flavio_antes);
   const fatiaAgora = (100 * v.lula) / Math.max(1, v.lula + v.flavio);
@@ -582,11 +582,11 @@ function cartaoFluxo(v) {
   return `<div class="xp-card fx">
     <div class="rot">Os dois cresceram desde o 1º turno · de onde vieram os votos novos</div>
     <div class="xp-sub">nas ${fmtN(v.secoes)} seções já apuradas que existem nos dois turnos</div>
-    <div class="fx-grade">
-      <div class="fx-t">De onde vieram</div><div>${barra(fontes)}${legenda(fontes)}</div>
-      <div class="fx-t">Para quem foram</div><div>${barra(destinos)}${legenda(destinos)}</div>
+    <div class="fl-grade">
+      <div class="fl-t">De onde vieram</div><div>${barra(fontes)}${legenda(fontes)}</div>
+      <div class="fl-t">Para quem foram</div><div>${barra(destinos)}${legenda(destinos)}</div>
     </div>
-    <p class="fx-frase">Lula e Flávio somaram <b>+${fmtN(tot)}</b> votos. ${frase}</p>
+    <p class="fl-frase">Lula e Flávio somaram <b>+${fmtN(tot)}</b> votos. ${frase}</p>
     <p class="xp-sub">É um balanço do total, não o caminho de cada eleitor: não dá para saber quem da 3ª via foi para quem.</p>
   </div>`;
 }
