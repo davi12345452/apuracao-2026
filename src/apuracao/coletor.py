@@ -1,4 +1,4 @@
-"""Processo coletor: exterior por BU (contínuo) + totalização oficial (a cada ~20 s).
+"""Processo coletor: exterior por BU (contínuo) + placar br/zz (a cada ~12 s) + UFs e municípios.
 
 Uso: python -m apuracao.coletor   (roda até Ctrl+C)
 """
@@ -33,17 +33,35 @@ def loop_exterior(db: DB, parar: threading.Event, workers: int, pausa: float) ->
         parar.wait(pausa)
 
 
-def loop_oficial(db: DB, parar: threading.Event, pausa: float, ufs_cada: float) -> None:
+def loop_topo(db: DB, parar: threading.Event, pausa: float, visto: dict) -> None:
+    """Placar do Brasil e do exterior (br, zz): 2 arquivos pequenos, com cliente e ritmo próprios.
+
+    Fica separado das UFs, que levam ~1,5 min por rodada e atrasariam o placar nacional.
+    """
     http = exterior.cliente(0.1)
-    ultimo_hg = None
-    ultimo_ufs = 0.0
     while not parar.is_set():
         try:
             topo = oficial.ciclo_topo(db, http)
             db.batida("oficial", json.dumps({k: {"hg": v.get("hg"), "st": v.get("st")} for k, v in topo.items()}))
-            hg = (topo.get("br") or {}).get("hg")
-            apurou = (topo.get("br") or {}).get("st", 0) > 0 or (topo.get("zz") or {}).get("st", 0) > 0
-            intervalo = ufs_cada if apurou else 600
+            visto["hg"] = (topo.get("br") or {}).get("hg")
+            visto["apurou"] = (topo.get("br") or {}).get("st", 0) > 0 or (topo.get("zz") or {}).get("st", 0) > 0
+        except Exception as e:  # noqa: BLE001
+            db.log("erro", f"loop_topo: {e!r}")
+        parar.wait(pausa)
+
+
+def loop_oficial(db: DB, parar: threading.Event, pausa: float, ufs_cada: float, visto: dict) -> None:
+    """UFs e municípios: roda quando o br muda de hora ou a cada ufs_cada segundos."""
+    http = exterior.cliente(0.1)
+    ultimo_hg = None
+    ultimo_ufs = 0.0
+    while not parar.is_set():
+        if "hg" not in visto:  # espera a primeira leitura do br
+            parar.wait(2)
+            continue
+        try:
+            hg = visto.get("hg")
+            intervalo = ufs_cada if visto.get("apurou") else 600
             if hg != ultimo_hg or time.monotonic() - ultimo_ufs > intervalo:
                 r = oficial.ciclo_ufs(db, http)
                 ultimo_ufs = time.monotonic()
@@ -77,6 +95,7 @@ def main(argv: list[str] | None = None) -> None:
     ap.add_argument("--workers", type=int, default=4)
     ap.add_argument("--pausa-exterior", type=float, default=30)
     ap.add_argument("--pausa-oficial", type=float, default=20)
+    ap.add_argument("--pausa-topo", type=float, default=12)
     ap.add_argument("--ufs-cada", type=float, default=60)
     ap.add_argument("--sem-mercados", action="store_true")
     ap.add_argument("--pausa-mercados", type=float, default=60)
@@ -87,7 +106,9 @@ def main(argv: list[str] | None = None) -> None:
     if not a.sem_exterior:
         th.append(threading.Thread(target=loop_exterior, args=(db, parar, a.workers, a.pausa_exterior), daemon=True))
     if not a.sem_oficial:
-        th.append(threading.Thread(target=loop_oficial, args=(db, parar, a.pausa_oficial, a.ufs_cada), daemon=True))
+        visto: dict = {}
+        th.append(threading.Thread(target=loop_topo, args=(db, parar, a.pausa_topo, visto), daemon=True))
+        th.append(threading.Thread(target=loop_oficial, args=(db, parar, a.pausa_oficial, a.ufs_cada, visto), daemon=True))
     if not a.sem_mercados:
         th.append(threading.Thread(target=loop_mercados, args=(db, parar, a.pausa_mercados), daemon=True))
     for t in th:
