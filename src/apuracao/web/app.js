@@ -431,6 +431,23 @@ function grafico(el, cfg) {
   sv.addEventListener("mouseleave", () => { tip.hidden = true; cruz.setAttribute("visibility", "hidden"); });
 }
 
+// ================================================================ feed do exterior: o que acabou de entrar (agente A)
+function renderFeedExterior(est) {
+  $("feed-titulo").textContent = "O que acabou de entrar";
+  $("feed-sub").textContent = "";
+  $("feed").innerHTML = "";
+}
+
+// ================================================================ Brasil: feed e análises (agente B)
+function renderFeedBrasil(est) {
+  $("feed-titulo").textContent = "O que acabou de entrar";
+  $("feed-sub").textContent = "";
+  $("feed").innerHTML = `<div class="vazio">Aparece a partir das 17h.</div>`;
+}
+function renderAnaliseBrasil(est) {
+  $("br-analise").innerHTML = "";
+}
+
 // ================================================================ método (recolhido)
 function metodo(p, escopo, est) {
   if (!p || !p.contado || p.lula_pct == null) return `<p class="vazio">Aparece junto com a projeção.</p>`;
@@ -535,6 +552,9 @@ function renderBrasil(est) {
     $("tabela").innerHTML = `<tbody><tr><td class="vazio">Aparece com a projeção, depois das 17h.</td></tr></tbody>`;
   }
   $("tabela-mais").innerHTML = "";
+  renderFeedBrasil(est);
+  $("br-analise").hidden = false;
+  renderAnaliseBrasil(est);
   renderMetodo(p, "brasil", est);
 }
 
@@ -599,6 +619,8 @@ function renderExterior(est) {
   $("tabela").innerHTML = cabTabela("País") + `<tbody>${lista.map((r) => linhaTabela(r.iso3, r.pais, `${r.secoes}/${r.secoes_tot}`,
     r.secoes_tot ? (100 * r.secoes) / r.secoes_tot : 0, r.secoes ? r.lula_pct : null, r.proj?.lula_final_pct, ok ? r.saldo : null, max)).join("")}</tbody>`;
   $("tabela-mais").innerHTML = linhas.length > 15 ? `<button class="mais" data-exp="paises">${expandido.paises ? "Mostrar só os 15 maiores" : `Mostrar todos (${linhas.length})`}</button>` : "";
+  renderFeedExterior(est);
+  $("br-analise").hidden = true;
   renderMetodo(p, "exterior", est);
 }
 

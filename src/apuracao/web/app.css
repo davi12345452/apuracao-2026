@@ -247,6 +247,12 @@ main { max-width: 1440px; margin: 0 auto; padding: 20px 24px 32px; }
 @media (max-width: 1000px) { .mk-agora { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 560px) { .mk-agora { grid-template-columns: 1fr; } }
 
+/* === feed do exterior (agente A) === */
+
+/* === Brasil: feed e análises (agente B) === */
+.br-analise { display: grid; gap: 20px; }
+.br-analise[hidden] { display: none; }
+
 /* coleta */
 .eventos { list-style: none; padding: 0; margin: 0; font: 12px/1.6 var(--mono); color: var(--text-2); max-height: 420px; overflow: auto; }
 .eventos li.erro { color: var(--erro); } .eventos li.aviso { color: var(--warn); }
