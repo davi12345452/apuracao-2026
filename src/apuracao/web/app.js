@@ -1465,6 +1465,7 @@ function render(est) {
   sd.querySelector("span").textContent = vg.status === "alerta" ? "alerta" : est.agora.slice(11, 16);
   if (aba === "brasil" || aba === "exterior") {
     if (aba === "brasil") renderBrasil(est); else renderExterior(est);
+    if (typeof renderViradaRitmo === "function") renderViradaRitmo(est, aba);
     renderMapa(est);
   }
   if (aba === "mercados") renderMercados(est);

@@ -17,6 +17,7 @@
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="ux.css">
+  <link rel="stylesheet" href="virada-ritmo.css">
 </head>
 <body>
   <header class="topo">
@@ -41,6 +42,8 @@
     <section class="aba" id="aba-mapa" role="tabpanel">
       <!-- 1. veredito numa faixa: quem vence, por quanto, quanto falta e as referências -->
       <div class="hero" id="hero"></div>
+      <!-- virada possível? e ritmo da apuração (virada-ritmo.js) -->
+      <div class="vr-bloco" id="vr-bloco" hidden></div>
 
       <div class="corpo">
         <div class="principal">
@@ -151,5 +154,6 @@
   <div id="tooltip" class="tooltip" hidden></div>
   <script src="app.js"></script>
   <script src="ux.js"></script>
+  <script src="virada-ritmo.js"></script>
 </body>
 </html>
