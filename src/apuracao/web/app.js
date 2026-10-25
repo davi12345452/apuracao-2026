@@ -1469,6 +1469,7 @@ function render(est) {
   }
   if (aba === "mercados") renderMercados(est);
   if (aba === "coleta") renderColeta(est);
+  if (typeof uxDepois === "function") uxDepois(est); // mini-placar, atalhos e "desde a última olhada" (ux.js)
 }
 
 function irPara(a) {

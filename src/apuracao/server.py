@@ -32,7 +32,7 @@ SEGURANCA = {
                                "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; "
                                "frame-ancestors 'none'; base-uri 'none'; form-action 'none'",
 }
-GZIP_TIPOS = (".js", ".css", ".json", ".html")
+GZIP_TIPOS = (".js", ".css", ".json", ".html", ".webmanifest", ".svg")
 
 
 def _json(x):
@@ -124,6 +124,8 @@ def handler(est: Estado):
         server_version = "apuracao"
         sys_version = ""
         timeout = 10  # conexão parada não prende uma thread por muito tempo
+        # o tipo do manifesto não depende do /etc/mime.types da máquina
+        extensions_map = {**SimpleHTTPRequestHandler.extensions_map, ".webmanifest": "application/manifest+json"}
 
         def __init__(self, *a, **kw):
             super().__init__(*a, directory=str(WEB), **kw)

@@ -1,0 +1,55 @@
+/* mini-placar, atalhos de seção e "desde a sua última olhada" (ux.js) */
+
+/* 1. mini-placar: ocupa o lugar do título quando o resumo sai da tela; mesma altura, nada pula */
+.marca { position: relative; min-width: 0; }
+.marca > .selo, .marca > .titulo { transition: opacity .18s; }
+.mp { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; padding: 6px 0; border: 0; background: none;
+  color: var(--text); font: 600 13px/1.3 var(--sans); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  opacity: 0; pointer-events: none; cursor: pointer; transition: opacity .18s; font-variant-numeric: tabular-nums; }
+.mp .mp-k { font: 500 10.5px/1 var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-right: 2px; }
+.mp .mk-m { margin-right: 4px; }
+.mp .mp-ap { color: var(--text-2); }
+.mp .mp-c { display: none; }
+.topo.mp-on .mp { opacity: 1; pointer-events: auto; }
+.topo.mp-on .marca > .selo, .topo.mp-on .marca > .titulo { opacity: 0; }
+.mp:focus-visible { outline: 2px solid var(--flavio); outline-offset: 2px; }
+
+/* 2. atalhos de seção: uma linha que rola na horizontal, colada embaixo do topo */
+.atalhos { position: sticky; top: var(--topo-h, 61px); z-index: 19; display: flex; gap: 6px; overflow-x: auto; overscroll-behavior-x: contain;
+  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  padding: 5px max(24px, calc((100% - 1440px) / 2 + 24px)); background: color-mix(in srgb, var(--bg) 88%, transparent);
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+.atalhos[hidden] { display: none; }
+.atalhos::-webkit-scrollbar { display: none; }
+.atalhos button { flex: none; min-height: 30px; padding: 0 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
+  color: var(--text-2); font: 500 13px var(--sans); cursor: pointer; white-space: nowrap; }
+.atalhos button:hover { color: var(--text); border-color: var(--text-2); }
+.atalhos button[aria-current="true"] { background: var(--text); color: var(--bg); border-color: var(--text); }
+.atalhos button:focus-visible { outline: 2px solid var(--flavio); outline-offset: 2px; }
+.ux-alvo, #feed-painel, #mapa { scroll-margin-top: calc(var(--fixo-h, 110px) + 10px); }
+@media (min-width: 1101px) { .lateral { top: calc(var(--fixo-h, 76px) + 12px); } }
+
+/* 3. aviso "desde a sua última olhada": embaixo, sem empurrar nada */
+.olhada { position: fixed; z-index: 30; right: 24px; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); width: min(440px, calc(100vw - 48px));
+  display: flex; align-items: flex-start; gap: 4px; padding: 10px 4px 10px 14px; background: var(--surface); color: var(--text);
+  border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 8px 28px rgba(0, 0, 0, .22); animation: olhada-in .22s ease-out; }
+.olhada[hidden] { display: none; }
+.olhada p { margin: 0; flex: 1; font-size: 13px; line-height: 1.45; color: var(--text-2); }
+.olhada p b { color: var(--text); font-weight: 650; }
+.olhada-x { flex: none; width: 36px; height: 36px; margin: -6px 0 -6px; border: 0; border-radius: 8px; background: none; color: var(--muted);
+  font: 400 22px/1 var(--sans); cursor: pointer; }
+.olhada-x:hover, .olhada-x:focus-visible { color: var(--text); background: var(--surface-2); outline: none; }
+@keyframes olhada-in { from { opacity: 0; transform: translateY(8px); } }
+@media (prefers-reduced-motion: reduce) { .olhada { animation: none; } .mp, .marca > .selo, .marca > .titulo { transition: none; } }
+
+@media (max-width: 760px) {
+  .mp { font-size: 12.5px; letter-spacing: -.01em; }
+  .mp .mp-k { font: 500 11px/1 var(--sans); text-transform: none; letter-spacing: 0; }
+  .mp .mk-m { width: 7px; height: 7px; margin-right: 3px; }
+  .mp .mp-l { display: none; } .mp .mp-c { display: inline; }
+  .topo.mp-on .andamento { display: none; }
+  .atalhos { padding: 3px 16px; gap: 6px; }
+  .atalhos button { min-height: 36px; padding: 0 13px; font-size: 13.5px; }
+  .olhada { left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom, 0px)); width: auto; }
+}
+@media (max-width: 370px) { .mp .mp-s { display: none; } }

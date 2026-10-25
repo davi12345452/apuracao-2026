@@ -1,0 +1,17 @@
+{
+  "name": "Apuração 2026",
+  "short_name": "Apuração",
+  "description": "Apuração do 2º turno de 2026 ao vivo: contado, projeção e exterior.",
+  "lang": "pt-BR",
+  "start_url": "/#brasil",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b0c0e",
+  "theme_color": "#0b0c0e",
+  "icons": [
+    { "src": "icone.svg", "sizes": "any", "type": "image/svg+xml" },
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icone-mask-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

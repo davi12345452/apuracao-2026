@@ -4,9 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Apuração 2026</title>
+  <meta name="theme-color" content="#f4f3ef" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0b0c0e" media="(prefers-color-scheme: dark)">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Apuração">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icone-180.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="ux.css">
 </head>
 <body>
   <header class="topo">
@@ -24,6 +34,7 @@
       <a id="saude" class="saude" href="#coleta" title="Saúde da coleta"><i></i><span>coleta</span></a>
     </div>
   </header>
+  <nav class="atalhos" id="atalhos" aria-label="Ir para a seção" hidden></nav>
 
   <main>
     <!-- ============ BRASIL e EXTERIOR (mesma estrutura) ============ -->
@@ -139,5 +150,6 @@
   <footer>Dados: resultados.tse.jus.br e dados abertos do TSE · malhas do IBGE. Candidatos na ordem do número na urna (13 e 22). O placar é sempre dito pelo nome de quem lidera. Projeções são estimativas estatísticas e podem errar.</footer>
   <div id="tooltip" class="tooltip" hidden></div>
   <script src="app.js"></script>
+  <script src="ux.js"></script>
 </body>
 </html>
