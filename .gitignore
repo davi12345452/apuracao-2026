@@ -4,3 +4,5 @@ __pycache__/
 data/*.db*
 data/cache/
 .pytest_cache/
+data/*.log
+data/*.pid
