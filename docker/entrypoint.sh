@@ -7,4 +7,6 @@ if [ ! -s "$APURACAO_DB" ] && [ -f /app/seed/apuracao.db.gz ]; then
   echo "volume vazio: restaurando a semente em $APURACAO_DB"
   gunzip -c /app/seed/apuracao.db.gz > "$APURACAO_DB"
 fi
-exec python -m apuracao.vigia
+# o volume da Railway chega como root: acerta o dono e roda o painel sem privilégio
+chown -R app:app "$APURACAO_DATA"
+exec setpriv --reuid=app --regid=app --init-groups python -m apuracao.vigia

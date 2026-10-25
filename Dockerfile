@@ -12,7 +12,8 @@ ENV TZ=America/Sao_Paulo \
     APURACAO_DATA=/data \
     APURACAO_DB=/data/apuracao.db \
     APURACAO_HOST=0.0.0.0 \
-    APURACAO_ALERTAS=1
+    APURACAO_ALERTAS=1 \
+    APURACAO_PUBLICO=1
 
 WORKDIR /app
 COPY requirements.txt .
@@ -22,7 +23,7 @@ COPY vendor ./vendor
 COPY data/cidades_exterior.json data/ensaio_2022.json ./data/
 COPY seed ./seed
 COPY docker/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /entrypoint.sh && useradd --system --uid 10001 --no-create-home app
 
 EXPOSE 8000
 ENTRYPOINT ["/entrypoint.sh"]

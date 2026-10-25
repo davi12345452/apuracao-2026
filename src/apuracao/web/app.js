@@ -152,12 +152,20 @@ function montarBR(g) {
   svg.addEventListener("mouseleave", () => { tip.hidden = true; ultimo?.classList.remove("on"); ultimo = null; });
   svg.addEventListener("click", (ev) => {
     const p = ev.target.closest(".m"); if (!p) return;
-    const r = MUN[p.dataset.k]; if (r) selecionar(r[2]);
+    const r = MUN[p.dataset.k]; if (r && r[2]) selecionar(r[2]);
   });
   return svg;
 }
 
-let MUN = {};
+let MUN = {}, FIX = null;
+async function garantirFix() {
+  if (FIX) return;
+  try {
+    const r = await fetch("/api/municipios");
+    const l = r.ok ? await r.json() : [];
+    if (l.length) { FIX = {}; for (const x of l) FIX[x[0]] = x; }
+  } catch {}
+}
 function brOk() {
   const p = EST?.brasil?.modelos?.[MODELO];
   return !!(p && p.disponivel && p.lula_pct != null && EST.fase === "apurando");
@@ -991,7 +999,9 @@ async function renderMapa(est) {
 
 function renderBrasil(est) {
   const b = est.brasil || {}, P = b.modelos || {}, p = P[MODELO], alt = P[MODELO_ALT];
-  MUN = {}; for (const r of b.mapa || []) MUN[r[0]] = r;
+  // o estado traz só o que muda; nome, UF, eleitorado e 1º turno vêm de /api/municipios, baixado uma vez
+  MUN = {};
+  for (const r of b.mapa || []) { const f = FIX?.[r[0]] || [r[0], "", "", 0, null]; MUN[r[0]] = [r[0], f[1], f[2], f[3], r[1], r[2], r[3], r[4], f[4]]; }
   const ok = brOk(), n = est.nacional, mk = est.mercados || {};
   const cas = ok ? passosCascata(p, agruparRegioes(p.por_uf), (g) => g.grupo) : null;
   $("hero").innerHTML = hero("brasil", est, p, alt, cas);
@@ -1530,9 +1540,13 @@ function initUI() {
 }
 
 async function ciclo() {
+  if (document.hidden && EST) return; // aba em segundo plano (celular bloqueado) não gasta dados
   try {
     const r = await fetch("/api/estado", { cache: "no-store" });
-    if (r.ok) render(await r.json());
+    if (!r.ok) return;
+    const est = await r.json();
+    if (!FIX) await garantirFix();
+    render(est);
   } catch (e) {
     $("andamento").textContent = "falha ao ler o servidor local";
   }
@@ -1543,4 +1557,5 @@ if ("ResizeObserver" in window) {
 }
 ciclo();
 setInterval(ciclo, POLL_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) ciclo(); });
 let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => EST && render(EST), 200); });
