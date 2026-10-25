@@ -3,126 +3,108 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Apuração 2026 · 2º turno</title>
+  <title>Apuração 2026</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
   <header class="topo">
-    <div class="topo-linha">
-      <div>
-        <div class="eyebrow">Painel local · 2º turno presidencial · 25/10/2026</div>
-        <h1>Apuração ao vivo</h1>
-      </div>
-      <div class="topo-dir">
-        <span id="status" class="pill">carregando…</span>
-        <span id="vigia" class="pill" title="Estado do vigia">vigia —</span>
-        <span id="atualizado" class="muted"></span>
-      </div>
+    <div class="marca">
+      <span class="selo">2º turno · 25 out 2026</span>
+      <span class="titulo">Apuração</span>
     </div>
-    <nav class="abas" role="tablist">
+    <nav class="escopos" role="tablist">
       <button role="tab" data-aba="brasil">Brasil</button>
       <button role="tab" data-aba="exterior">Exterior</button>
       <button role="tab" data-aba="mercados">Mercados</button>
-      <button role="tab" data-aba="coleta">Coleta</button>
     </nav>
+    <div class="topo-dir">
+      <div id="andamento" class="andamento"></div>
+      <a id="saude" class="saude" href="#coleta" title="Saúde da coleta"><i></i><span>coleta</span></a>
+    </div>
   </header>
 
   <main>
-    <!-- ============ BRASIL ============ -->
-    <section class="aba" id="aba-brasil" role="tabpanel">
-      <div class="seletor-linha">
-        <span class="muted">Base da projeção</span>
-        <div class="seg" id="seg-brasil"></div>
+    <!-- ============ BRASIL e EXTERIOR (mesma estrutura) ============ -->
+    <section class="aba" id="aba-mapa" role="tabpanel">
+      <div class="palco">
+        <div class="mapa-card">
+          <div class="mapa-barra">
+            <div class="modos" id="modos"></div>
+            <div class="mapa-acoes" id="mapa-acoes"></div>
+          </div>
+          <div class="mapa" id="mapa"><div class="carregando">carregando mapa…</div></div>
+          <div class="mapa-pe">
+            <div class="legenda-mapa" id="legenda-mapa"></div>
+            <div class="mapa-nota" id="mapa-nota"></div>
+          </div>
+        </div>
+        <aside class="lateral">
+          <div class="veredito" id="veredito"></div>
+          <div class="bloco-lat" id="contado"></div>
+          <div class="bloco-lat" id="chances"></div>
+          <div class="bloco-lat selecao" id="selecao"></div>
+        </aside>
       </div>
-      <div class="dupla" id="br-placar"></div>
-      <div class="card">
-        <div class="card-cab"><h2>Como a projeção chega nesse número</h2><span class="muted" id="br-explica-sub"></span></div>
-        <div id="br-ledger"></div>
-        <div class="passos" id="br-passos"></div>
-      </div>
-      <div class="card">
-        <div class="card-cab"><h2>De onde vem o que falta</h2><span class="muted">por estado, ordenado pelo peso no saldo final</span></div>
-        <div id="br-grupos"></div>
-      </div>
-      <div class="card">
-        <div class="card-cab"><h2>Projeção × contado ao longo da apuração</h2><span class="muted" id="br-conv-sub"></span></div>
-        <div id="br-conv" class="grafico"></div>
-        <div id="br-ensaio"></div>
-      </div>
-      <div class="card">
-        <div class="card-cab"><h2>Nas mesmas urnas já apuradas</h2><span class="muted">mesmos municípios, na mesma proporção apurada</span></div>
-        <div id="br-mesmas"></div>
-      </div>
-      <div class="card">
-        <div class="card-cab"><h2>Por estado</h2><span class="muted">Lula entre os válidos de Lula e Flávio, nas mesmas urnas</span></div>
-        <div class="tabela-wrap"><table id="br-ufs"></table></div>
-      </div>
-    </section>
 
-    <!-- ============ EXTERIOR ============ -->
-    <section class="aba" id="aba-exterior" role="tabpanel" hidden>
-      <div class="seletor-linha">
-        <span class="muted">Base da projeção</span>
-        <div class="seg" id="seg-exterior"></div>
-      </div>
-      <div class="dupla" id="ex-placar"></div>
-      <div class="card">
-        <div class="card-cab"><h2>Como a projeção do exterior chega nesse número</h2><span class="muted" id="ex-explica-sub"></span></div>
-        <div id="ex-ledger"></div>
-        <div class="passos" id="ex-passos"></div>
-      </div>
-      <div class="card">
-        <div class="card-cab"><h2>De onde vem o que falta</h2><span class="muted">por país, ordenado pelo peso no saldo final</span></div>
-        <div id="ex-grupos"></div>
-      </div>
-      <div class="card">
-        <div class="card-cab"><h2>Projeção × contado conforme os boletins chegam</h2><span class="muted">hora em que o TSE recebeu cada boletim</span></div>
-        <div id="ex-conv" class="grafico"></div>
-      </div>
-      <div class="card">
-        <div class="card-cab"><h2>Nas mesmas urnas já apuradas</h2><span class="muted">mesmas cidades, na mesma proporção apurada</span></div>
-        <div id="ex-mesmas"></div>
-      </div>
-      <div class="card">
-        <div class="card-cab"><h2>Por país</h2><span class="muted" id="ex-paises-sub"></span></div>
-        <div class="tabela-wrap"><table id="ex-paises"></table></div>
-      </div>
+      <section class="faixa-baixo">
+        <div class="painel">
+          <header><h2 id="cascata-titulo">Do contado à projeção</h2><p id="cascata-sub"></p></header>
+          <div id="cascata"></div>
+        </div>
+        <div class="painel">
+          <header><h2>A noite</h2><p id="noite-sub"></p></header>
+          <div id="noite" class="grafico"></div>
+        </div>
+      </section>
+
+      <section class="painel">
+        <header><h2 id="tabela-titulo">Estados</h2><p id="tabela-sub"></p></header>
+        <div class="tabela-wrap"><table id="tabela" class="tabela"></table></div>
+        <div id="tabela-mais"></div>
+      </section>
+
+      <details class="painel metodo" id="metodo">
+        <summary><h2>Como a projeção funciona</h2><span>e como ela se saiu em 2022</span></summary>
+        <div id="metodo-corpo"></div>
+      </details>
     </section>
 
     <!-- ============ MERCADOS ============ -->
     <section class="aba" id="aba-mercados" role="tabpanel" hidden>
-      <div class="card">
-        <div class="card-cab"><h2>Chance de Lula vencer</h2><span class="muted" id="mk-sub"></span></div>
+      <div class="painel">
+        <header><h2>Chance de Lula vencer</h2><p id="mk-sub"></p></header>
         <div id="mk-prob"></div>
       </div>
       <div class="dupla">
-        <div class="card"><div class="card-cab"><h2>Fatia de Lula nos válidos</h2></div><div id="mk-fatia"></div></div>
-        <div class="card"><div class="card-cab"><h2>Margem de vitória</h2></div><div id="mk-margem"></div></div>
+        <div class="painel"><header><h2>Fatia de Lula nos válidos</h2></header><div id="mk-fatia"></div></div>
+        <div class="painel"><header><h2>Margem de vitória</h2></header><div id="mk-margem"></div></div>
       </div>
       <div class="dupla">
-        <div class="card"><div class="card-cab"><h2>Comparecimento</h2></div><div id="mk-comp"></div></div>
-        <div class="card"><div class="card-cab"><h2>Quem vence no exterior</h2></div><div id="mk-ext"></div></div>
+        <div class="painel"><header><h2>Comparecimento</h2></header><div id="mk-comp"></div></div>
+        <div class="painel"><header><h2>Quem vence no exterior</h2></header><div id="mk-ext"></div></div>
       </div>
-      <div class="card">
-        <div class="card-cab"><h2>Chance de Lula ao longo do dia</h2><span class="muted">mercados a cada minuto; nosso modelo a cada atualização do TSE</span></div>
+      <div class="painel">
+        <header><h2>Chance de Lula ao longo do dia</h2><p>mercados a cada minuto; nosso modelo a cada atualização do TSE</p></header>
         <div id="mk-hist" class="grafico"></div>
       </div>
-      <p class="aviso">Cotações lidas das APIs públicas da Polymarket e da Kalshi (preço médio entre compra e venda). O DNS da rede local bloqueia esses domínios; o coletor resolve os nomes por DNS-over-HTTPS.</p>
+      <p class="aviso">Cotações das APIs públicas da Polymarket e da Kalshi (preço médio entre compra e venda). O DNS da rede local bloqueia esses domínios; o coletor resolve os nomes por DNS-over-HTTPS.</p>
     </section>
 
     <!-- ============ COLETA ============ -->
     <section class="aba" id="aba-coleta" role="tabpanel" hidden>
-      <div class="card">
-        <div class="card-cab"><h2>Saúde da coleta</h2><span class="muted" id="cl-sub"></span></div>
+      <div class="painel">
+        <header><h2>Saúde da coleta</h2><p id="cl-sub"></p></header>
         <div id="cl-saude"></div>
       </div>
-      <div class="card">
-        <div class="card-cab"><h2>Eventos</h2></div>
+      <div class="painel">
+        <header><h2>Eventos</h2></header>
         <ul id="cl-eventos" class="eventos"></ul>
       </div>
     </section>
   </main>
-  <footer>Dados: resultados.tse.jus.br e dados abertos do TSE. Projeções são estimativas estatísticas e podem errar.</footer>
+  <footer>Dados: resultados.tse.jus.br e dados abertos do TSE · malhas do IBGE. Projeções são estimativas estatísticas e podem errar.</footer>
   <div id="tooltip" class="tooltip" hidden></div>
   <script src="app.js"></script>
 </body>

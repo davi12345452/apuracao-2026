@@ -77,6 +77,8 @@ class Ctx:
             arr["tem"] = tem
             self.B[f] = arr
         muni = {(r["uf"], r["mun"]): r for r in db.query("SELECT * FROM municipio")}
+        self.ibge = [(muni.get(k) or {}).get("ibge") or "" for k in self.chaves]
+        self.nome = [(muni.get(k) or {}).get("nome") or "" for k in self.chaves]
         self.pais = np.array([(muni.get(k) or {}).get("pais") or "" for k in self.chaves])
         self.iso3 = {(muni.get(k) or {}).get("pais"): (muni.get(k) or {}).get("iso3") for k in self.chaves if k[0] == "zz"}
         self.bu_rows = sorted(db.query("SELECT * FROM bu"), key=_quando)
@@ -171,6 +173,30 @@ def _agrupar(u: Unidades, p: dict, rotulos: np.ndarray, nomes: dict | None = Non
             "lula_final_pct": _pct(lula_c + lula_esp, vv_c + val_esp),
         })
     out.sort(key=lambda x: -abs(x["saldo_esperado"]))
+    return out
+
+
+def _mapa_br(ctx: Ctx, u: Unidades, p: dict) -> list[list]:
+    """Uma linha por município para o mapa: [ibge, nome, uf, eleitorado, apurado %, Lula contado %,
+    Lula projetado %, desvio pp, Lula no 1º turno (2 candidatos) %]."""
+    un = p.get("_unid")
+    b1 = ctx.B["2026_1t"]
+    t1 = np.where(b1["lula"] + b1["direita"] > 0, 100 * b1["lula"] / np.maximum(b1["lula"] + b1["direita"], 1), np.nan)
+    r = lambda x, d=1: None if x is None or not np.isfinite(x) else round(float(x), d)  # noqa: E731
+    out = []
+    for i in np.where(~ctx.ext)[0]:
+        if not ctx.ibge[i]:
+            continue
+        rep = u.vv[i] > 0
+        contado = 100 * u.lula[i] / u.vv[i] if rep else None
+        fin = desv = None
+        if un is not None:
+            vr, sr = un["vv_rest"][i], un["share_rest"][i]
+            tot = u.vv[i] + vr
+            fin = 100 * (u.lula[i] + vr * sr) / tot if tot > 0 else None
+            desv = 100 * un["desvio"][i] if rep else None
+        out.append([ctx.ibge[i], ctx.nome[i].title(), str(ctx.uf[i]), int(u.te[i]),
+                    r(100 * u.est[i] / u.te[i] if u.te[i] else 0), r(contado), r(fin), r(desv, 2), r(t1[i])])
     return out
 
 
@@ -289,6 +315,7 @@ def estado(db: DB) -> dict:
             p["por_uf"] = _agrupar(u, p, ctx.uf, NOMES_UF)
         brasil["modelos"][nome] = _limpar(p)
         if nome == "vs_2026_1t":
+            brasil["mapa"] = _mapa_br(ctx, u, p)
             brasil["mesmas_urnas"] = ctx.comparar(u)
             por_uf = []
             for gi, uf in enumerate(UFS_TODAS):
