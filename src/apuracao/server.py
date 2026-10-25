@@ -14,10 +14,16 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 from .db import DB
-from .painel import estado
+from .painel import estado, registrar_hist
 
 WEB = Path(__file__).resolve().parent / "web"
 CACHE_S = 8
+
+
+def _json(x):
+    if hasattr(x, "item"):  # escalares numpy
+        return x.item()
+    return str(x)
 
 
 class Estado:
@@ -31,7 +37,9 @@ class Estado:
         with self.lock:
             if time.monotonic() - self.t > CACHE_S:
                 try:
-                    self.corpo = json.dumps(estado(self.db), ensure_ascii=False, default=str).encode()
+                    est = estado(self.db)
+                    registrar_hist(self.db, est)
+                    self.corpo = json.dumps(est, ensure_ascii=False, default=_json).encode()
                 except Exception:  # noqa: BLE001 - mantém o último bom e registra
                     self.db.log("erro", "painel: " + traceback.format_exc(limit=3))
                 self.t = time.monotonic()
@@ -54,6 +62,11 @@ def handler(est: Estado):
                 self.wfile.write(corpo)
                 return
             super().do_GET()
+
+        def end_headers(self):
+            if not self.path.startswith("/api/"):
+                self.send_header("Cache-Control", "no-cache")
+            super().end_headers()
 
         def log_message(self, *a):
             pass

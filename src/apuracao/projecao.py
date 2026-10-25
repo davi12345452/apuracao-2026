@@ -151,7 +151,18 @@ def projetar(u: Unidades, n_boot: int = 300, seed: int = 0, tau: float | None = 
         sh = np.where(rep, np.clip(s + choque[u.grupo] * FATOR_PARCIAL, 0, 1), sh)
         sims[b] = (u.lula.sum() + (vv_rest * sh).sum()) / vv_fin
 
+    tot_w = w.sum()
     out.update({
+        "contado": {"lula": float(u.lula.sum()), "flavio": float(u.vv.sum() - u.lula.sum()),
+                    "validos": float(u.vv.sum()), "comparecimento": float(u.c.sum()), "eleitorado": float(u.est.sum())},
+        "estimado": {"lula": float((vv_rest * share_rest).sum()), "flavio": float((vv_rest * (1 - share_rest)).sum()),
+                     "validos": float(vv_rest.sum()), "comparecimento": float(c_rest.sum()), "eleitorado": float(resto.sum())},
+        "desvio_medio_pp": float(100 * (w * d).sum() / tot_w) if tot_w else 0.0,
+        "municipios": {"completos": int((rep & (u.est >= u.te)).sum()), "parciais": int((rep & (u.est < u.te)).sum()),
+                       "sem_dados": int((~rep).sum())},
+        # vetores por unidade, para o painel agregar por UF ou país (retirados antes de virar JSON)
+        "_unid": {"vv_rest": vv_rest, "share_rest": share_rest, "c_rest": c_rest, "resto": resto,
+                  "base": base, "desvio": np.where(rep, s - base, sw_g[u.grupo]), "rep": rep},
         "lula_pct": float(100 * p50),
         "flavio_pct": float(100 - 100 * p50),
         "p10": float(100 * np.quantile(sims, 0.1)),

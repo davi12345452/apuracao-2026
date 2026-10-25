@@ -8,62 +8,118 @@
 </head>
 <body>
   <header class="topo">
-    <div>
-      <div class="eyebrow">Painel local · 2º turno presidencial · 25/10/2026</div>
-      <h1>Apuração ao vivo</h1>
+    <div class="topo-linha">
+      <div>
+        <div class="eyebrow">Painel local · 2º turno presidencial · 25/10/2026</div>
+        <h1>Apuração ao vivo</h1>
+      </div>
+      <div class="topo-dir">
+        <span id="status" class="pill">carregando…</span>
+        <span id="vigia" class="pill" title="Estado do vigia">vigia —</span>
+        <span id="atualizado" class="muted"></span>
+      </div>
     </div>
-    <div class="topo-dir">
-      <span id="status" class="pill">carregando…</span>
-      <span id="atualizado" class="muted"></span>
-    </div>
+    <nav class="abas" role="tablist">
+      <button role="tab" data-aba="brasil">Brasil</button>
+      <button role="tab" data-aba="exterior">Exterior</button>
+      <button role="tab" data-aba="mercados">Mercados</button>
+      <button role="tab" data-aba="coleta">Coleta</button>
+    </nav>
   </header>
 
   <main>
-    <section class="card" id="placar-card">
-      <div class="card-cab"><h2 id="placar-titulo">Brasil · totalização oficial do TSE</h2><span id="placar-apurado" class="muted"></span></div>
-      <div class="placar">
-        <div class="lado lula"><div class="nome">Lula <span class="num">13</span></div><div class="pct" id="p-lula">—</div><div class="votos" id="v-lula"></div></div>
-        <div class="lado flavio"><div class="nome">Flávio <span class="num">22</span></div><div class="pct" id="p-flavio">—</div><div class="votos" id="v-flavio"></div></div>
+    <!-- ============ BRASIL ============ -->
+    <section class="aba" id="aba-brasil" role="tabpanel">
+      <div class="seletor-linha">
+        <span class="muted">Base da projeção</span>
+        <div class="seg" id="seg-brasil"></div>
       </div>
-      <div class="barra"><div class="b-lula" id="b-lula"></div><div class="b-flavio" id="b-flavio"></div><div class="meio"></div></div>
-      <div class="kpis" id="kpis-placar"></div>
-      <p class="aviso" id="placar-aviso"></p>
+      <div class="dupla" id="br-placar"></div>
+      <div class="card">
+        <div class="card-cab"><h2>Como a projeção chega nesse número</h2><span class="muted" id="br-explica-sub"></span></div>
+        <div id="br-ledger"></div>
+        <div class="passos" id="br-passos"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>De onde vem o que falta</h2><span class="muted">por estado, ordenado pelo peso no saldo final</span></div>
+        <div id="br-grupos"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>Projeção × contado ao longo da apuração</h2><span class="muted" id="br-conv-sub"></span></div>
+        <div id="br-conv" class="grafico"></div>
+        <div id="br-ensaio"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>Nas mesmas urnas já apuradas</h2><span class="muted">mesmos municípios, na mesma proporção apurada</span></div>
+        <div id="br-mesmas"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>Por estado</h2><span class="muted">Lula entre os válidos de Lula e Flávio, nas mesmas urnas</span></div>
+        <div class="tabela-wrap"><table id="br-ufs"></table></div>
+      </div>
     </section>
 
-    <section class="grid2">
-      <div class="card proj" id="proj-2022"></div>
-      <div class="card proj" id="proj-1t"></div>
+    <!-- ============ EXTERIOR ============ -->
+    <section class="aba" id="aba-exterior" role="tabpanel" hidden>
+      <div class="seletor-linha">
+        <span class="muted">Base da projeção</span>
+        <div class="seg" id="seg-exterior"></div>
+      </div>
+      <div class="dupla" id="ex-placar"></div>
+      <div class="card">
+        <div class="card-cab"><h2>Como a projeção do exterior chega nesse número</h2><span class="muted" id="ex-explica-sub"></span></div>
+        <div id="ex-ledger"></div>
+        <div class="passos" id="ex-passos"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>De onde vem o que falta</h2><span class="muted">por país, ordenado pelo peso no saldo final</span></div>
+        <div id="ex-grupos"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>Projeção × contado conforme os boletins chegam</h2><span class="muted">hora em que o TSE recebeu cada boletim</span></div>
+        <div id="ex-conv" class="grafico"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>Nas mesmas urnas já apuradas</h2><span class="muted">mesmas cidades, na mesma proporção apurada</span></div>
+        <div id="ex-mesmas"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>Por país</h2><span class="muted" id="ex-paises-sub"></span></div>
+        <div class="tabela-wrap"><table id="ex-paises"></table></div>
+      </div>
     </section>
 
-    <section class="card">
-      <div class="card-cab"><h2>Nas mesmas urnas já apuradas</h2><span class="muted">mesmos municípios, na mesma proporção apurada</span></div>
-      <div id="mesmas"></div>
+    <!-- ============ MERCADOS ============ -->
+    <section class="aba" id="aba-mercados" role="tabpanel" hidden>
+      <div class="card">
+        <div class="card-cab"><h2>Chance de Lula vencer</h2><span class="muted" id="mk-sub"></span></div>
+        <div id="mk-prob"></div>
+      </div>
+      <div class="dupla">
+        <div class="card"><div class="card-cab"><h2>Fatia de Lula nos válidos</h2></div><div id="mk-fatia"></div></div>
+        <div class="card"><div class="card-cab"><h2>Margem de vitória</h2></div><div id="mk-margem"></div></div>
+      </div>
+      <div class="dupla">
+        <div class="card"><div class="card-cab"><h2>Comparecimento</h2></div><div id="mk-comp"></div></div>
+        <div class="card"><div class="card-cab"><h2>Quem vence no exterior</h2></div><div id="mk-ext"></div></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>Chance de Lula ao longo do dia</h2><span class="muted">mercados a cada minuto; nosso modelo a cada atualização do TSE</span></div>
+        <div id="mk-hist" class="grafico"></div>
+      </div>
+      <p class="aviso">Cotações lidas das APIs públicas da Polymarket e da Kalshi (preço médio entre compra e venda). O DNS da rede local bloqueia esses domínios; o coletor resolve os nomes por DNS-over-HTTPS.</p>
     </section>
 
-    <section class="card">
-      <div class="card-cab"><h2>Lula entre os válidos ao longo da apuração</h2><span class="muted" id="serie-sub"></span></div>
-      <div id="serie" class="grafico"></div>
-    </section>
-
-    <section class="card" id="exterior-card">
-      <div class="card-cab"><h2>Exterior · boletins de urna seção a seção</h2><span id="ext-sub" class="muted"></span></div>
-      <div class="kpis" id="kpis-ext"></div>
-      <div id="ext-mesmas"></div>
-      <div id="ext-proj" class="ext-proj proj"></div>
-      <h3>Lula entre os válidos no exterior, por boletim recebido</h3>
-      <div id="ext-serie" class="grafico"></div>
-      <h3>Por país</h3>
-      <div class="tabela-wrap"><table id="ext-tabela"></table></div>
-    </section>
-
-    <section class="card">
-      <div class="card-cab"><h2>Por estado</h2><span class="muted">percentuais de Lula entre os válidos (2 candidatos)</span></div>
-      <div class="tabela-wrap"><table id="uf-tabela"></table></div>
-    </section>
-
-    <section class="card">
-      <div class="card-cab"><h2>Coleta</h2><span class="muted" id="coleta-sub"></span></div>
-      <ul id="eventos" class="eventos"></ul>
+    <!-- ============ COLETA ============ -->
+    <section class="aba" id="aba-coleta" role="tabpanel" hidden>
+      <div class="card">
+        <div class="card-cab"><h2>Saúde da coleta</h2><span class="muted" id="cl-sub"></span></div>
+        <div id="cl-saude"></div>
+      </div>
+      <div class="card">
+        <div class="card-cab"><h2>Eventos</h2></div>
+        <ul id="cl-eventos" class="eventos"></ul>
+      </div>
     </section>
   </main>
   <footer>Dados: resultados.tse.jus.br e dados abertos do TSE. Projeções são estimativas estatísticas e podem errar.</footer>

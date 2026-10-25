@@ -156,7 +156,7 @@ def main():
         oficial.ciclo_topo(db, http)
         r = oficial.ciclo_ufs(db, http, max_mun=20000)
         e = estado(db)
-        P = e.get("projecoes", {})
+        P = (e.get("brasil") or {}).get("modelos", {})
         linha = {"frac": frac, "hg": hg, "apurado_pct": (e["nacional"] or {}).get("apurado_pct"),
                  "lula_pct_parcial": (e["nacional"] or {}).get("lula_pct"), **r}
         for nome, p in P.items():
@@ -168,6 +168,11 @@ def main():
         hist.append(linha)
         print(json.dumps(linha, ensure_ascii=False))
 
+    if parar is None:
+        (RAIZ / "data" / "ensaio_2022.json").write_text(json.dumps({"real": real, "pontos": [
+            {"apurado": h["apurado_pct"], "parcial": h["lula_pct_parcial"], "p50": h.get("vs_2026_1t"),
+             "p10": (h.get("vs_2026_1t_faixa") or [None, None])[0], "p90": (h.get("vs_2026_1t_faixa") or [None, None])[1]}
+            for h in hist if h.get("vs_2026_1t") is not None]}, ensure_ascii=False))
     if parar is not None:
         from apuracao.server import Estado, handler
 
@@ -182,7 +187,7 @@ def main():
         "br_flavio_exato": n["flavio"] == verdade["flavio"],
         "br_validos_exato": n["validos"] == verdade["vv"],
         "mun_soma_exata": (soma_mun["l"], soma_mun["f"], soma_mun["v"]) == (verdade["lula"], verdade["flavio"], verdade["vv"]),
-        "proj_final_exata": all(abs(p["lula_pct"] - real) < 1e-6 for p in fim["projecoes"].values()),
+        "proj_final_exata": all(abs(p["lula_pct"] - real) < 1e-6 for p in fim["brasil"]["modelos"].values()),
         "sem_erros_coletor": not erros,
     }
     for nome in ("vs_2026_1t", "vs_2022_2t"):
