@@ -619,7 +619,7 @@ function renderMetodo(p, escopo, est) {
   }
 }
 
-// ================================================================ Mercados
+// ================================================================ Mercados: movimentos × exterior
 function intervaloMargem(rot) {
   const lado = /lula/i.test(rot) ? 1 : -1;
   const nums = (rot.match(/\d+(?:[.,]\d+)?/g) || []).map((v) => +v.replace(",", "."));
@@ -638,65 +638,212 @@ function baldesMargem(lista, margem) {
       <span class="p">${fmtP(100 * (m.prob || 0), 0)}</span></div>`;
   }).join("")}</div>`;
 }
-function kpi(k, v, d = "") {
-  return `<div class="kpi"><div class="k">${k}</div><div class="v">${v}</div>${d ? `<div class="d">${d}</div>` : ""}</div>`;
+
+const hhmm = (min) => {
+  const d = Math.floor(min / 1440), m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${d < 0 ? "ontem " : ""}${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+};
+const ultimo = (s, t) => { let v = null; for (const p of s) { if (p[0] > t) break; v = p[1]; } return v; };
+const margemDe = (fatia) => (fatia == null ? null : 2 * fatia - 100);
+const fmtMargem = (m, d = 1) => (m == null ? "—" : `${m >= 0 ? "Lula" : "Flávio"} por ${Math.abs(m).toFixed(d).replace(".", ",")} pp`);
+// variação a favor de Lula: vermelho ▲ / a favor de Flávio: azul ▼
+const fmtDelta = (d, dec = 1, un = " pp") => (d == null ? `<span class="muted">—</span>`
+  : Math.abs(d) < 0.05 ? `<span class="muted">0${un}</span>`
+  : `<span class="${d > 0 ? "pos" : "neg"}">${d > 0 ? "▲" : "▼"} ${Math.abs(d).toFixed(dec).replace(".", ",")}${un}</span>`);
+const nomeOnda = (o, n = 3) => o.paises.slice(0, n).join(", ") + (o.paises.length > n ? ` +${o.paises.length - n}` : "");
+
+// ---------- linha do tempo: painéis empilhados com o mesmo eixo de horário ----------
+function linhaTempo(el, cfg) {
+  const W = el.clientWidth || 900, m = { l: 48, r: 132, t: 22, gap: 26 };
+  el.dataset.w = W;
+  const x0 = cfg.x0, x1 = cfg.x1;
+  const X = (v) => m.l + ((v - x0) / (x1 - x0)) * (W - m.l - m.r);
+  let y = m.t, svg = "";
+  const geo = [];
+  for (const p of cfg.paineis) {
+    const h = p.h, ys = [];
+    for (const s of p.series) for (const q of s.pts) if (q[0] >= x0 && q[0] <= x1) ys.push(q[1]);
+    if (p.ref != null) ys.push(p.ref);
+    let y0 = p.yMin ?? (ys.length ? Math.min(...ys) : 0), y1 = p.yMax ?? (ys.length ? Math.max(...ys) : 1);
+    if (p.yMin == null || p.yMax == null) { const pad = Math.max(p.padMin ?? 0.5, (y1 - y0) * 0.15); if (p.yMin == null) y0 -= pad; if (p.yMax == null) y1 += pad; }
+    const Y = (v) => y + (1 - (v - y0) / (y1 - y0 || 1)) * h;
+    geo.push({ p, y, h, Y });
+    svg += `<text x="${m.l}" y="${y - 8}" font-size="12" font-weight="650" fill="var(--text)">${esc(p.titulo)}</text>`;
+    if (p.sub) svg += `<text x="${W - m.r}" y="${y - 8}" font-size="11" text-anchor="end" fill="var(--muted)">${esc(p.sub)}</text>`;
+    const passo = [0.25, 0.5, 1, 2, 5, 10, 20, 25, 50].find((q) => (y1 - y0) / q <= 4) || 50;
+    for (let v = Math.ceil(y0 / passo) * passo; v <= y1; v += passo) {
+      svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/>
+        <text x="${m.l - 6}" y="${Y(v) + 4}" font-size="10.5" text-anchor="end" fill="var(--muted)">${esc(p.yFmt(v))}</text>`;
+    }
+    if (p.ref != null) svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(p.ref)}" y2="${Y(p.ref)}" stroke="var(--ref)" stroke-dasharray="4 3"/>`;
+    for (const b of p.barras || []) {
+      const bh = (b.v / p.barMax) * h;
+      svg += `<rect x="${X(b.x)}" y="${y + h - bh}" width="${Math.max(1.5, X(b.x + b.w) - X(b.x) - 1)}" height="${bh}" rx="1.5" fill="${b.cor}"/>`;
+    }
+    const rot = [];
+    for (const s of p.series) {
+      const pts = s.pts.filter((q) => q[0] >= x0 - 30 && q[0] <= x1);
+      if (!pts.length) continue;
+      let d = "";
+      pts.forEach((q, i) => {
+        const px = Math.max(m.l, X(q[0])).toFixed(1), py = Y(q[1]).toFixed(1);
+        d += i === 0 ? `M${px},${py}` : s.degrau ? `H${px}V${py}` : `L${px},${py}`;
+      });
+      if (s.ate != null) d += `H${X(s.ate).toFixed(1)}`;
+      svg += `<path d="${d}" fill="none" stroke="${s.cor}" stroke-width="${s.fina ? 1.5 : 2}" stroke-linejoin="round" ${s.tracejada ? 'stroke-dasharray="5 4"' : ""}/>`;
+      const u = pts[pts.length - 1];
+      rot.push({ y: Y(u[1]), t: `${s.nome} ${(p.rotFmt || p.yFmt)(u[1], true)}`, cor: s.cor, x: X(s.ate ?? u[0]) });
+    }
+    rot.sort((a, b) => a.y - b.y);
+    for (let i = 1; i < rot.length; i++) if (rot[i].y - rot[i - 1].y < 13) rot[i].y = rot[i - 1].y + 13;
+    for (const r of rot) svg += `<text x="${W - m.r + 6}" y="${r.y + 4}" font-size="11" font-weight="600" fill="var(--text)"><tspan fill="${r.cor}">●</tspan> ${esc(r.t)}</text>`;
+    y += h + m.gap + 8;
+  }
+  const H = y - m.gap + 14;
+  // faixas (episódios) e marcos (fechamentos) atravessam todos os painéis
+  let fundo = "";
+  for (const f0 of cfg.faixas || []) {
+    const f = { ...f0, de: Math.max(f0.de, x0) };
+    if (f.ate <= x0) continue;
+    fundo += `<rect x="${X(f.de)}" y="${m.t - 4}" width="${Math.max(3, X(f.ate) - X(f.de))}" height="${H - m.t - 10}" fill="var(--text)" opacity=".07"/>
+      <text x="${(X(f.de) + X(f.ate)) / 2}" y="${H - 2}" font-size="10.5" text-anchor="middle" fill="var(--text-2)" font-weight="600">${esc(f.rot)}</text>`;
+  }
+  let frente = "";
+  const usados = [];
+  for (const k of cfg.marcos || []) {
+    frente += `<line x1="${X(k.x)}" x2="${X(k.x)}" y1="${m.t - 4}" y2="${H - 16}" stroke="var(--text-2)" stroke-dasharray="2 3" opacity="${k.forte ? 0.7 : 0.3}"/>`;
+  }
+  // rótulos: os fechamentos com mais eleitores escolhem lugar primeiro
+  for (const k of (cfg.marcos || []).filter((k) => k.forte).sort((a, b) => (b.peso || 0) - (a.peso || 0))) {
+    const x = X(k.x);
+    if (usados.some((u) => Math.abs(u - x) < 72)) continue;
+    usados.push(x);
+    frente += `<text x="${x + 3}" y="${m.t + 6}" font-size="10" fill="var(--text-2)">${esc(k.rot)}</text>`;
+  }
+  frente += `<line x1="${X(cfg.agora)}" x2="${X(cfg.agora)}" y1="${m.t - 4}" y2="${H - 16}" stroke="var(--text)" stroke-width="1.5"/>
+    <text x="${X(cfg.agora) - 4}" y="${H - 4}" font-size="10.5" text-anchor="end" fill="var(--text)" font-weight="650">agora</text>`;
+  const ticks = []; for (let t = Math.ceil(x0 / 120) * 120; t <= x1; t += 120) ticks.push(t);
+  const eixo = ticks.map((t) => `<text x="${X(t)}" y="${H - 16}" font-size="10.5" text-anchor="middle" fill="var(--muted)">${hhmm(t)}</text>`).join("");
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" style="height:${H}px" role="img" aria-label="Mercados ao longo do dia">${fundo}${svg}${frente}${eixo}
+    <line class="cruz" y1="${m.t - 4}" y2="${H - 16}" stroke="var(--text)" opacity=".5" visibility="hidden"/>
+    <rect x="${m.l}" y="0" width="${W - m.l - m.r}" height="${H}" fill="transparent"/></svg>`;
+  const sv = el.querySelector("svg"), cruz = sv.querySelector(".cruz"), tip = $("tooltip");
+  sv.addEventListener("mousemove", (ev) => {
+    const r = sv.getBoundingClientRect(), px = ((ev.clientX - r.left) / r.width) * W;
+    if (px < m.l || px > W - m.r) { tip.hidden = true; cruz.setAttribute("visibility", "hidden"); return; }
+    const t = x0 + ((px - m.l) / (W - m.l - m.r)) * (x1 - x0);
+    cruz.setAttribute("x1", px); cruz.setAttribute("x2", px); cruz.setAttribute("visibility", "visible");
+    let h = `<div class="tt-n">${hhmm(t)}</div><div class="tt-g">`;
+    for (const g of geo) for (const s of g.p.series) {
+      if (s.semTip) continue;
+      const v = ultimo(s.pts, t);
+      if (v != null && (s.ate == null || t <= s.ate + 1)) h += `<span><span style="color:${s.cor}">●</span> ${esc(s.tipNome || s.nome)}</span><span>${g.p.yFmt(v, true)}</span>`;
+    }
+    h += "</div>";
+    const perto = (cfg.marcos || []).filter((k) => Math.abs(k.x - t) <= 20 && k.tip);
+    if (perto.length) h += `<div class="tt-s" style="margin:6px 0 0">${perto.map((k) => esc(k.tip)).join("<br>")}</div>`;
+    tooltip(ev, h);
+  });
+  sv.addEventListener("mouseleave", () => { tip.hidden = true; cruz.setAttribute("visibility", "hidden"); });
 }
+
 function renderMercados(est) {
-  const mk = est.mercados || {}, pm = mk.polymarket || {}, k = mk.kalshi || {};
-  const P = est.brasil?.modelos || {};
-  $("mk-sub").textContent = `Polymarket ${hora(pm.ts)} · Kalshi ${hora(k.ts)}`;
-  const linha = (fonte, sub, prob, espera) => `<div class="prob-linha"><div class="fonte">${fonte}<small>${sub}</small></div>
-    ${prob == null ? `<div class="muted">${espera || "sem dados"}</div>` : `<div class="trilho"><div class="bl" style="width:${prob}%"></div><div class="bf"></div></div>`}
-    <div class="v">${prob == null ? "—" : fmtP(prob, 0)}</div></div>`;
-  const ok = brOk();
-  const pr = (id) => (ok && P[id]?.lula_pct != null ? P[id].prob_lula : null);
-  const espera = `aguarda ${fmtP(est.min_apurado, 0)} do eleitorado apurado (depois das 17h)`;
-  $("mk-prob").innerHTML =
-    linha("Nosso modelo", "base 1º turno 2026", pr(MODELO), espera) + linha("Nosso modelo", "base 2º turno 2022", pr(MODELO_ALT), espera) +
-    linha("Polymarket", "Brazil Presidential Election", pm.p_lula == null ? null : 100 * pm.p_lula) +
-    linha("Kalshi", "KXBRPRES", k.p_lula == null ? null : 100 * k.p_lula);
-  const p = P[MODELO];
-  $("mk-fatia").innerHTML = `<div class="kpis">
-      ${kpi("Kalshi · mediana implícita", fmtP(k.fatia_lula_mediana, 2), "onde a chance de Lula ≥ x cruza 50%")}
-      ${kpi("Nosso modelo", ok ? fmtP(p.lula_pct, 2) : "—", ok ? `faixa ${fmtP(p.p10)} a ${fmtP(p.p90)}` : "aguarda a apuração")}
-    </div><div class="sub-h">Kalshi: chance de Lula ter pelo menos x% dos válidos</div><div id="mk-escada" class="grafico" style="height:220px"></div>`;
+  const mk = est.mercados || {}, pm = mk.polymarket || {}, k = mk.kalshi || {}, mv = est.movimentos;
+  if (!mv) { $("mk-agora").innerHTML = `<div class="vazio">Histórico dos mercados ainda não carregado.</div>`; return; }
+  const S = mv.series, agora = mv.agora_min;
+  const ok = brOk(), p = est.brasil?.modelos?.[MODELO];
+  // ---------- agora ----------
+  const delta = (s, desde) => { const a = ultimo(s, desde), b = ultimo(s, agora); return a == null || b == null ? null : b - a; };
+  const marg = S.fatia.map((q) => [q[0], margemDe(q[1])]);
+  const prox = mv.ondas.find((o) => !o.fechou && o.eleitorado >= 1000);
+  const card = (rot, corpo, pe) => `<div class="mk-card"><div class="rot">${rot}</div>${corpo}<div class="pe">${pe}</div></div>`;
+  const linhaAg = (nome, v, d) => `<div class="mk-linha"><span>${nome}</span><b>${fmtP(v, 1)}</b>${fmtDelta(d)}</div>`;
+  $("mk-agora").innerHTML =
+    card("Chance de Lula vencer", linhaAg("Polymarket", pm.p_lula == null ? null : 100 * pm.p_lula, delta(S.poly, 0)) + linhaAg("Kalshi", k.p_lula == null ? null : 100 * k.p_lula, delta(S.kalshi, 0)) +
+      (ok ? linhaAg("Nosso modelo", p.prob_lula, null) : ""), "variação desde 00h") +
+    card("Diferença esperada pela Kalshi", `<div class="mk-grande ${margemDe(k.fatia_lula_mediana) >= 0 ? "pos" : "neg"}">${fmtMargem(margemDe(k.fatia_lula_mediana))}</div>
+      <div class="mk-linha"><span>desde 00h</span>${fmtDelta(delta(marg, 0), 2)}</div><div class="mk-linha"><span>última hora</span>${fmtDelta(delta(marg, agora - 60), 2)}</div>`,
+      "Lula − Flávio nos válidos, mediana implícita na escada") +
+    card("Lula vence no exterior", linhaAg("Polymarket", pm.exterior_lula == null ? null : 100 * pm.exterior_lula, delta(S.poly_ext, 0)) + linhaAg("Kalshi", k.exterior_lula == null ? null : 100 * k.exterior_lula, delta(S.kalshi_ext, 0)),
+      "variação desde 00h") +
+    card("Próximo fechamento", prox ? `<div class="mk-grande">${hhmm(prox.min)}</div><div class="mk-prox">${esc(nomeOnda(prox, 4))}</div>
+      <div class="mk-linha"><span>${fmtMi(prox.eleitorado)} eleitores</span><b>em ${Math.max(0, Math.round(prox.min - agora))} min</b></div>` : `<div class="mk-prox">Todas as urnas do exterior já fecharam.</div>`,
+      "horário de Brasília");
+  // ---------- linha do tempo ----------
+  const x0 = 0, x1 = Math.max(22 * 60, agora + 30);
+  const balde = 15, cont = {};
+  for (let i = 0; i < mv.exterior.length; i++) {
+    const q = mv.exterior[i], b = Math.floor(q.min / balde) * balde;
+    cont[b] = (cont[b] || 0) + 1;
+  }
+  const barras = Object.entries(cont).map(([b, n]) => ({ x: +b, w: balde, v: n, cor: "var(--a3)" }));
+  const extPct = mv.exterior.map((q) => [q.min, (100 * q.lula) / Math.max(1, q.lula + q.flavio)]);
+  const pf = (v) => fmtP(v, 0), pf1 = (v, tip) => fmtP(v, tip ? 1 : 0);
+  const nossoProb = mv.nosso.map((h) => [h.min, h.prob]), nossoMarg = mv.nosso.map((h) => [h.min, 2 * h.p50 - 100]);
+  $("mk-dia-sub").textContent = `${hhmm(x0)} a ${hhmm(x1)} · horário de Brasília`;
+  linhaTempo($("mk-linha"), {
+    x0, x1, agora,
+    paineis: [
+      { titulo: "Chance de Lula vencer", h: 120, yFmt: pf1, padMin: 2, series: [
+        { nome: "Polymarket", cor: "var(--poly)", pts: S.poly, ate: agora },
+        { nome: "Kalshi", cor: "var(--kalshi)", pts: S.kalshi, ate: agora },
+        ...(nossoProb.length ? [{ nome: "Nosso", tipNome: "Nosso modelo", cor: "var(--text)", pts: nossoProb, tracejada: true }] : []) ] },
+      { titulo: "Diferença esperada: Lula − Flávio nos válidos", sub: "Kalshi, mediana da escada", h: 100, ref: 0, padMin: 0.3,
+        yFmt: (v, tip) => (tip ? fmtMargem(v, 2) : (v > 0 ? "+" : "") + v.toFixed(1).replace(".", ",")),
+        rotFmt: (v) => (v > 0 ? "+" : v < 0 ? "−" : "") + Math.abs(v).toFixed(2).replace(".", ",") + " pp", series: [
+        { nome: "Kalshi", tipNome: "Diferença (Kalshi)", cor: "var(--kalshi)", pts: marg, ate: agora, fina: true },
+        ...(nossoMarg.length ? [{ nome: "Nosso", tipNome: "Diferença (nosso modelo)", cor: "var(--text)", pts: nossoMarg, tracejada: true }] : []) ] },
+      { titulo: "Lula vence no exterior (mercados)", h: 80, yFmt: pf1, padMin: 2, series: [
+        { nome: "Polymarket", tipNome: "Exterior · Polymarket", cor: "var(--poly)", pts: S.poly_ext, ate: agora, fina: true },
+        { nome: "Kalshi", tipNome: "Exterior · Kalshi", cor: "var(--kalshi)", pts: S.kalshi_ext, ate: agora, fina: true } ] },
+      { titulo: "Exterior: Lula nos boletins já contados", sub: "barras: boletins recebidos a cada 15 min", h: 90, yFmt: pf1, ref: 50, padMin: 3,
+        barMax: Math.max(...barras.map((b) => b.v), 1) * 2.2, barras, series: [
+        { nome: "Lula", tipNome: "Lula no exterior (acumulado)", cor: "var(--lula)", pts: extPct, degrau: true, ate: extPct.length ? agora : null } ] },
+    ],
+    marcos: mv.ondas.map((o) => ({ x: o.min, forte: o.eleitorado >= 10000, rot: o.paises[0], peso: o.eleitorado,
+      tip: `${hhmm(o.min)} fecham ${nomeOnda(o, 4)} (${fmtMi(o.eleitorado)} eleitores)` })),
+    faixas: mv.episodios.map((e, i) => ({ de: e.de, ate: e.ate, rot: String(i + 1) })),
+  });
+  // ---------- tabela por fechamento ----------
+  const lista = mv.ondas.filter((o) => expandido.ondas || o.eleitorado >= 1000);
+  const mvd = (o, chave, dec = 1) => { const v = o.mercado?.[chave]; return v && v[0] != null && v[1] != null ? fmtDelta(v[1] - v[0], dec) : `<span class="muted">—</span>`; };
+  $("mk-ondas").innerHTML = `<thead><tr><th>Fecha</th><th>Quem</th><th>Eleitores</th><th>Boletins</th><th>Lula nos boletins</th><th>× 1º turno*</th>
+      <th>Chance de Lula</th><th>Diferença esperada</th><th>Lula no exterior</th></tr></thead><tbody>` +
+    lista.map((o) => {
+      const d1 = o.lula_pct != null && o.lula_1t_pct != null ? o.lula_pct - o.lula_1t_pct : null;
+      const futuro = !o.fechou;
+      const parcial = o.fechou && o.mercado_ate != null && o.mercado_ate < o.min + 90;
+      return `<tr class="${futuro ? "futuro" : ""}"><td><b>${hhmm(o.min)}</b></td>
+        <td class="quem" title="${esc(o.paises.join(", "))}">${esc(nomeOnda(o))}</td>
+        <td>${fmtMi(o.eleitorado)}</td>
+        <td>${futuro ? `<span class="muted">em ${Math.round(o.min - agora)} min</span>` : `${o.bus}/${o.secoes}`}</td>
+        <td>${o.lula_pct == null ? `<span class="muted">—</span>` : `<span class="${o.lula_pct >= 50 ? "pct-l" : "pct-f"}">${fmtP(o.lula_pct)}</span>`}</td>
+        <td>${fmtDelta(d1)}</td>
+        <td>${futuro ? "" : mvd(o, "chance")}</td><td>${futuro ? "" : mvd(o, "margem", 2)}</td><td>${futuro ? "" : mvd(o, "kalshi_ext")}${parcial ? ` <span class="muted" title="Ainda não passaram 90 min">…</span>` : ""}</td></tr>`;
+    }).join("") + `</tbody>`;
+  const nPeq = mv.ondas.filter((o) => o.eleitorado < 1000).length;
+  $("mk-ondas-mais").innerHTML = (nPeq ? `<button class="mais" data-exp="ondas">${expandido.ondas ? "Esconder os fechamentos pequenos" : `Mostrar também ${nPeq} fechamentos com menos de mil eleitores`}</button>` : "") +
+    `<p class="nota-leitura" style="margin-top:8px">* Lula nos boletins já chegados menos Lula no 1º turno nas mesmas cidades (só entre Lula e Flávio). ▲ vermelho: a favor de Lula · ▼ azul: a favor de Flávio. "Lula no exterior" é o mercado da Kalshi.</p>`;
+  // ---------- episódios ----------
+  $("mk-ep-sub").textContent = `quando a chance média andou ${fmtP(mv.limiar_pp, 1).replace("%", " pp")} ou mais em ${mv.janela_min} min`;
+  $("mk-episodios").innerHTML = mv.episodios.length ? mv.episodios.map((e, i) => {
+    const fech = e.fecharam.length ? `Fecharam por perto: <b>${esc(e.fecharam.slice(0, 4).map((f) => f.pais).join(", "))}</b> (${fmtMi(e.fecharam_eleitorado)} eleitores).` : "Nenhum fechamento do exterior por perto.";
+    const bus = e.boletins ? `Chegaram ${e.boletins} boletins${e.bu_paises.length ? ` (${esc(e.bu_paises.join(", "))})` : ""}: Lula ${fmtP((100 * e.bu_lula) / Math.max(1, e.bu_lula + e.bu_flavio))}.` : "Nenhum boletim chegou nessa janela.";
+    return `<div class="ep"><div class="ep-n">${i + 1}</div><div>
+      <div class="ep-t">${hhmm(e.de)}–${hhmm(e.ate)} · chance de Lula ${fmtP(e.chance_de)} → ${fmtP(e.chance_ate)} ${fmtDelta(e.delta)}</div>
+      <div class="ep-d">Diferença esperada: ${fmtMargem(e.margem[0], 2)} → ${fmtMargem(e.margem[1], 2)}. ${fech} ${bus}</div></div></div>`;
+  }).join("") : `<div class="vazio">Nenhum movimento forte hoje até agora: o mercado andou devagar.</div>`;
+  // ---------- retrato (recolhido) ----------
+  if (!$("mk-detalhes").open) return;
   grafico($("mk-escada"), {
     aria: "Escada da Kalshi", xFmt: (v) => fmtP(v, 1), yMin: 0, yMax: 100, refs: [{ y: 50 }],
     vrefs: ok ? [{ x: p.lula_pct, label: "nosso modelo", solida: true, cor: "var(--text)" }] : [],
     series: [{ nome: "Kalshi", cor: "var(--kalshi)", pts: (k.escada_lula || []).map((e) => ({ x: e.limiar, y: 100 * e.prob })) }],
   });
   const margem = ok ? 2 * p.lula_pct - 100 : null;
-  $("mk-margem").innerHTML = `<div class="muted" style="font-size:12px">Diferença entre Lula e Flávio, em pontos dos válidos.${margem != null ? ` Nosso modelo: <b>${fmtPP(Math.abs(margem))}</b> para ${margem >= 0 ? "Lula" : "Flávio"}.` : ""}</div>
-    <div class="sub-h">Kalshi</div>${baldesMargem(k.margem, margem)}<div class="sub-h">Polymarket</div>${baldesMargem(pm.margem, margem)}`;
-  const compNosso = ok ? 100 - p.abstencao_final_pct : null;
-  const comp = (pm.comparecimento || []).map((c) => {
-    const nums = (c.rotulo.match(/\d+/g) || []).map(Number);
-    const iv = c.rotulo.includes("<") ? [0, nums[0]] : c.rotulo.includes("mais") ? [nums[0], 101] : [nums[0], nums[1]];
-    const nosso = compNosso != null && compNosso >= iv[0] && compNosso < iv[1];
-    return `<div class="balde ${nosso ? "nosso" : ""}"><span class="rot">${esc(c.rotulo)}</span><div class="b" style="width:${100 * (c.prob || 0)}%;background:var(--poly)"></div><span class="p">${fmtP(100 * (c.prob || 0), 0)}</span></div>`;
-  }).join("");
-  $("mk-comp").innerHTML = `<div class="kpis">
-      ${kpi("Nosso modelo", compNosso != null ? fmtP(compNosso) : "—", ok ? fmtN(p.comparecimento_final) + " votantes" : "aguarda a apuração")}
-      ${kpi("Kalshi · mediana", k.comparecimento_mediana ? fmtN(k.comparecimento_mediana) : "—", "votantes")}
-      ${kpi("1º turno 2026", "78,9%", "125.275.835 votantes")}
-    </div><div class="sub-h">Polymarket: comparecimento</div><div class="baldes">${comp || '<div class="vazio">Sem dados.</div>'}</div>`;
-  const pe = est.exterior?.modelos?.[MODELO];
-  const peOk = pe && pe.lula_pct != null && pe.disponivel;
-  $("mk-ext").innerHTML =
-    linha("Nosso modelo", "exterior, base 1º turno 2026", peOk ? pe.prob_lula : null, "aguarda boletins") +
-    linha("Polymarket", "1st Place Abroad", pm.exterior_lula == null ? null : 100 * pm.exterior_lula) +
-    linha("Kalshi", "KXBRRUNOFFABROAD", k.exterior_lula == null ? null : 100 * k.exterior_lula) +
-    (peOk ? `<p class="muted" style="margin-top:8px;font-size:12px">Nossa projeção para o exterior: Lula ${fmtP(pe.lula_pct)} (faixa ${fmtP(pe.p10)} a ${fmtP(pe.p90)}).</p>` : "");
-  const H = mk.hist || {};
-  const nossoH = (est.brasil?.hist || []).filter((h) => h.modelo === MODELO);
-  grafico($("mk-hist"), {
-    aria: "Chance de Lula ao longo do dia", xFmt: fmtHora, yMin: 0, yMax: 100, refs: [{ y: 50 }],
-    series: [
-      { nome: "Polymarket", cor: "var(--poly)", pts: (H.polymarket || []).filter((r) => r.p_lula != null).map((r) => ({ x: tms(r.t), y: 100 * r.p_lula })) },
-      { nome: "Kalshi", cor: "var(--kalshi)", pts: (H.kalshi || []).filter((r) => r.p_lula != null).map((r) => ({ x: tms(r.t), y: 100 * r.p_lula })) },
-      { nome: "Nosso modelo", cor: "var(--text)", pts: nossoH.map((r) => ({ x: tms(r.ts), y: r.prob })) },
-    ],
-  });
+  $("mk-margem").innerHTML = `<div class="sub-h">Margem · Kalshi</div>${baldesMargem(k.margem, margem)}<div class="sub-h">Margem · Polymarket</div>${baldesMargem(pm.margem, margem)}`;
+  const comp = (pm.comparecimento || []).map((c) => `<div class="balde"><span class="rot">${esc(c.rotulo)}</span><div class="b" style="width:${100 * (c.prob || 0)}%;background:var(--poly)"></div><span class="p">${fmtP(100 * (c.prob || 0), 0)}</span></div>`).join("");
+  $("mk-comp").innerHTML = `<div class="sub-h">Comparecimento · Polymarket (Kalshi: mediana ${k.comparecimento_mediana ? fmtN(k.comparecimento_mediana) : "—"} votantes; 1º turno: 78,9%)</div><div class="baldes">${comp}</div>`;
 }
 
 // ================================================================ Coleta
@@ -777,6 +924,7 @@ function initUI() {
     if (ex) { expandido[ex.dataset.exp] = !expandido[ex.dataset.exp]; if (EST) render(EST); }
   });
   $("metodo").addEventListener("toggle", () => { if ($("metodo").open && EST) render(EST); });
+  $("mk-detalhes").addEventListener("toggle", () => { if ($("mk-detalhes").open && EST) render(EST); });
   irPara((location.hash || "#brasil").slice(1));
 }
 
@@ -789,6 +937,9 @@ async function ciclo() {
   }
 }
 initUI();
+if ("ResizeObserver" in window) {
+  new ResizeObserver(() => { const el = $("mk-linha"); if (EST && aba === "mercados" && +el.dataset.w !== el.clientWidth) renderMercados(EST); }).observe($("mk-linha"));
+}
 ciclo();
 setInterval(ciclo, POLL_MS);
 let rz; addEventListener("resize", () => { clearTimeout(rz); rz = setTimeout(() => EST && render(EST), 200); });

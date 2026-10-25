@@ -73,23 +73,35 @@
 
     <!-- ============ MERCADOS ============ -->
     <section class="aba" id="aba-mercados" role="tabpanel" hidden>
-      <div class="painel">
-        <header><h2>Chance de Lula vencer</h2><p id="mk-sub"></p></header>
-        <div id="mk-prob"></div>
-      </div>
-      <div class="dupla">
-        <div class="painel"><header><h2>Fatia de Lula nos válidos</h2></header><div id="mk-fatia"></div></div>
-        <div class="painel"><header><h2>Margem de vitória</h2></header><div id="mk-margem"></div></div>
-      </div>
-      <div class="dupla">
-        <div class="painel"><header><h2>Comparecimento</h2></header><div id="mk-comp"></div></div>
-        <div class="painel"><header><h2>Quem vence no exterior</h2></header><div id="mk-ext"></div></div>
-      </div>
-      <div class="painel">
-        <header><h2>Chance de Lula ao longo do dia</h2><p>mercados a cada minuto; nosso modelo a cada atualização do TSE</p></header>
-        <div id="mk-hist" class="grafico"></div>
-      </div>
-      <p class="aviso">Cotações das APIs públicas da Polymarket e da Kalshi (preço médio entre compra e venda). O DNS da rede local bloqueia esses domínios; o coletor resolve os nomes por DNS-over-HTTPS.</p>
+      <div class="mk-agora" id="mk-agora"></div>
+
+      <section class="painel">
+        <header><h2>O dia nos mercados</h2><p id="mk-dia-sub"></p></header>
+        <div id="mk-linha" class="linha-tempo"></div>
+        <p class="nota-leitura">As linhas verticais marcam o fechamento das urnas no exterior (17h locais). As faixas marcam os momentos em que a chance de Lula andou rápido.</p>
+      </section>
+
+      <section class="painel">
+        <header><h2>Cada fechamento e o que o mercado fez depois</h2><p>de 15 min antes a 90 min depois do fechamento</p></header>
+        <div class="tabela-wrap"><table id="mk-ondas" class="tabela ondas"></table></div>
+        <div id="mk-ondas-mais"></div>
+        <p class="nota-leitura">Como ler: se Lula vai melhor que no 1º turno nas cidades que fecharam e, logo depois, a chance e a diferença esperada andam a favor dele, o mercado provavelmente está reagindo ao exterior. Coincidência no tempo não prova causa.</p>
+      </section>
+
+      <section class="painel">
+        <header><h2>Movimentos fortes</h2><p id="mk-ep-sub"></p></header>
+        <div id="mk-episodios" class="episodios"></div>
+      </section>
+
+      <details class="painel metodo" id="mk-detalhes">
+        <summary><h2>Retrato do mercado agora</h2><span>escada da Kalshi, margens e comparecimento</span></summary>
+        <div class="dupla" style="margin-top:14px">
+          <div><div class="sub-h">Kalshi: chance de Lula ter pelo menos x% dos válidos</div><div id="mk-escada" class="grafico" style="height:220px"></div></div>
+          <div><div id="mk-margem"></div></div>
+        </div>
+        <div id="mk-comp" style="margin-top:14px"></div>
+        <p class="aviso" style="margin-top:14px">Cotações das APIs públicas da Polymarket e da Kalshi (preço médio entre compra e venda; o histórico vem das APIs de série de preços). O DNS da rede local bloqueia esses domínios; o coletor resolve os nomes por DNS-over-HTTPS.</p>
+      </details>
     </section>
 
     <!-- ============ COLETA ============ -->

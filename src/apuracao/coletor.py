@@ -54,12 +54,19 @@ def loop_oficial(db: DB, parar: threading.Event, pausa: float, ufs_cada: float) 
         parar.wait(pausa)
 
 
-def loop_mercados(db: DB, parar: threading.Event, pausa: float) -> None:
+def loop_mercados(db: DB, parar: threading.Event, pausa: float, hist_cada: float = 600) -> None:
+    ult_hist = 0.0
     while not parar.is_set():
         try:
             mercados.coletar(db)
         except Exception as e:  # noqa: BLE001
             db.log("erro", f"loop_mercados: {e!r}")
+        if time.monotonic() - ult_hist > hist_cada:
+            try:
+                mercados.historico(db)
+            except Exception as e:  # noqa: BLE001
+                db.log("erro", f"histórico de mercados: {e!r}")
+            ult_hist = time.monotonic()
         parar.wait(pausa)
 
 

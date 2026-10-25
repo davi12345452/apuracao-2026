@@ -8,7 +8,7 @@ from datetime import datetime
 
 import numpy as np
 
-from . import tse
+from . import movimentos, tse
 from .db import DB
 from .projecao import MIN_APURADO, Unidades, projetar
 
@@ -334,6 +334,19 @@ def estado(db: DB) -> dict:
     brasil["serie"] = [{"t": r["ts_coleta"], "hg": r["hg"], "apurado": _pct(r["secoes_apur"], r["secoes_tot"]),
                         "lula_pct": _pct(r["lula"], r["validos"])} for r in serie]
     out["brasil"] = brasil
+
+    # ---------------- Movimentos dos mercados × exterior ----------------
+    b1 = ctx.B["2026_1t"]
+    cidades = [{"mun": k[1], "nome": ctx.nome[i], "pais": str(ctx.pais[i]), "iso3": ctx.iso3.get(str(ctx.pais[i])) or "",
+                "eleitorado": int(((ctx.ab.get(k) or {}).get("eleitorado")) or b1["aptos"][i]),
+                "secoes": ctx.secoes_cidade.get(k[1], 0),
+                "t1_2v": (float(b1["lula"][i] / (b1["lula"][i] + b1["direita"][i]))
+                          if b1["lula"][i] + b1["direita"][i] > 0 else None)}
+               for i, k in enumerate(ctx.chaves) if k[0] == "zz"]
+    try:
+        out["movimentos"] = movimentos.montar(db, cidades, ctx.bu_rows, brasil["hist"])
+    except Exception as e:  # noqa: BLE001 - o painel segue sem a aba de movimentos
+        db.log("aviso", f"movimentos: {e!r}")
 
     # ---------------- Exterior ----------------
     ext: dict = {"modelos": {}}

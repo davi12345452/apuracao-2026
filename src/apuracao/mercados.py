@@ -8,11 +8,15 @@ from __future__ import annotations
 
 import json
 import subprocess
+import time
 from datetime import datetime
 
 DOH = "https://cloudflare-dns.com/dns-query"
 POLY = "https://gamma-api.polymarket.com/events?slug="
 KALSHI = "https://api.elections.kalshi.com/trade-api/v2/markets?status=open&limit=100&series_ticker="
+KALSHI_VELAS = "https://api.elections.kalshi.com/trade-api/v2/series/{serie}/markets/{ticker}/candlesticks?start_ts={de}&end_ts={ate}&period_interval=1"
+POLY_HIST = "https://clob.polymarket.com/prices-history?market={token}&startTs={de}&fidelity=5"
+JANELA_HIST = 30 * 3600  # histórico: últimas 30 h (cobre o dia da eleição desde a madrugada)
 
 POLY_EVENTOS = {
     "vencedor": "brazil-presidential-election",
@@ -176,4 +180,90 @@ def coletar(db) -> dict:
             db.log("aviso", f"mercado {nome}: {e!r}")
             res[nome] = "erro"
     db.batida("mercados", json.dumps(res))
+    return res
+
+
+# ---------- histórico (APIs de séries; preenche o dia inteiro, inclusive antes do coletor subir) ----------
+
+def _poly_token_lula(slug: str) -> str | None:
+    ev = _get(POLY + slug)
+    ev = ev[0] if isinstance(ev, list) and ev else ev
+    for m in (ev or {}).get("markets") or []:
+        if not m.get("closed") and _lado(m.get("question", "")) == "lula":
+            return json.loads(m.get("clobTokenIds") or "[]")[0]
+    return None
+
+
+def _poly_hist(slug: str, de: int) -> list[tuple[int, float]]:
+    tok = _poly_token_lula(slug)
+    if not tok:
+        return []
+    h = _get(POLY_HIST.format(token=tok, de=de)).get("history") or []
+    return [(int(p["t"]), float(p["p"])) for p in h if p.get("p") is not None]
+
+
+def _kalshi_velas(serie: str, ticker: str, de: int, ate: int) -> list[tuple[int, float]]:
+    """Velas de 1 min → ponto médio entre compra e venda no fechamento de cada minuto."""
+    d = _get(KALSHI_VELAS.format(serie=serie, ticker=ticker, de=de, ate=ate), timeout=30)
+    out = []
+    for c in d.get("candlesticks") or []:
+        bid = _f((c.get("yes_bid") or {}).get("close_dollars"))
+        ask = _f((c.get("yes_ask") or {}).get("close_dollars"))
+        if bid is not None and ask is not None and 0 <= ask - bid <= 0.1:
+            out.append((int(c["end_period_ts"]), (bid + ask) / 2))
+        elif _f((c.get("price") or {}).get("close_dollars")) is not None:
+            out.append((int(c["end_period_ts"]), _f(c["price"]["close_dollars"])))
+    return out
+
+
+def _kalshi_ticker_lula(serie: str) -> str | None:
+    for m in _kalshi(serie):
+        if _lado(m["rotulo"]) == "lula":
+            return m["ticker"]
+    return None
+
+
+def historico(db) -> dict:
+    """Atualiza mercado_serie com as últimas JANELA_HIST horas. Séries (todas sobre Lula):
+    vencedor, exterior (prob. de vencer) e, na Kalshi, fatia_mediana (fatia de Lula nos válidos
+    implícita na escada KXVOTEBR2, minuto a minuto)."""
+    ate = int(time.time())
+    de = ate - JANELA_HIST
+    linhas: list[tuple] = []
+    res = {}
+    try:
+        linhas += [("polymarket", "vencedor", t, v) for t, v in _poly_hist(POLY_EVENTOS["vencedor"], de)]
+        linhas += [("polymarket", "exterior", t, v) for t, v in _poly_hist(POLY_EVENTOS["exterior"], de)]
+        res["polymarket"] = "ok"
+    except Exception as e:  # noqa: BLE001
+        res["polymarket"] = f"erro {e!r}"[:120]
+    try:
+        for nome, serie in (("vencedor", KALSHI_SERIES["vencedor"]), ("exterior", KALSHI_SERIES["exterior"])):
+            tk = _kalshi_ticker_lula(serie)
+            if tk:
+                linhas += [("kalshi", nome, t, v) for t, v in _kalshi_velas(serie, tk, de, ate)]
+        # escada da fatia: um mercado por limiar; a mediana sai minuto a minuto
+        por_min: dict[int, list[tuple[float, float]]] = {}
+        for m in _kalshi(KALSHI_SERIES["fatia"]):
+            t = m["ticker"] or ""
+            try:
+                limiar = float(t.rsplit("-", 1)[-1])
+            except ValueError:
+                continue
+            lula = "LULA" in t
+            if not lula and "FBOL" not in t:
+                continue
+            for ts, p in _kalshi_velas(KALSHI_SERIES["fatia"], t, de, ate):
+                por_min.setdefault(ts, []).append((limiar, p) if lula else (100 - limiar, 1 - p))
+        for ts, degraus in por_min.items():
+            med = mediana_escada(degraus)
+            if med is not None:
+                linhas.append(("kalshi", "fatia_mediana", ts, med))
+        res["kalshi"] = "ok"
+    except Exception as e:  # noqa: BLE001
+        res["kalshi"] = f"erro {e!r}"[:120]
+    if linhas:
+        db.executemany("INSERT OR REPLACE INTO mercado_serie VALUES (?,?,?,?)", linhas)
+    res["pontos"] = len(linhas)
+    db.batida("mercados_hist", json.dumps(res))
     return res

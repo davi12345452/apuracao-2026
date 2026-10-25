@@ -68,6 +68,10 @@ CREATE TABLE IF NOT EXISTS saude (          -- batimentos dos laços e estado do
 CREATE TABLE IF NOT EXISTS mercado (         -- cotações de Polymarket e Kalshi ao longo do tempo
     ts TEXT NOT NULL, fonte TEXT NOT NULL, dados TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS mercado_serie (   -- histórico de preços (APIs de histórico), um ponto por minuto/5 min
+    fonte TEXT NOT NULL, serie TEXT NOT NULL, ts INTEGER NOT NULL, valor REAL,
+    PRIMARY KEY (fonte, serie, ts)
+);
 CREATE TABLE IF NOT EXISTS proj_hist (       -- projeções ao longo da noite (para o gráfico de convergência)
     ts TEXT NOT NULL, escopo TEXT NOT NULL, apurado REAL, parcial REAL,
     modelo TEXT NOT NULL, p50 REAL, p10 REAL, p90 REAL, prob REAL,
