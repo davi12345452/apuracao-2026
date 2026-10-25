@@ -1,0 +1,746 @@
+{
+ "29173": {
+  "pais": "Nepal",
+  "iso3": "NPL"
+ },
+ "29254": {
+  "pais": "Costa do Marfim",
+  "iso3": "CIV"
+ },
+ "29262": {
+  "pais": "Emirados Árabes Unidos",
+  "iso3": "ARE"
+ },
+ "29270": {
+  "pais": "Gana",
+  "iso3": "GHA"
+ },
+ "29289": {
+  "pais": "Jordânia",
+  "iso3": "JOR"
+ },
+ "29297": {
+  "pais": "Turquia",
+  "iso3": "TUR"
+ },
+ "29300": {
+  "pais": "Argélia",
+  "iso3": "DZA"
+ },
+ "29319": {
+  "pais": "Uruguai",
+  "iso3": "URY"
+ },
+ "29327": {
+  "pais": "Paraguai",
+  "iso3": "PRY"
+ },
+ "29335": {
+  "pais": "Grécia",
+  "iso3": "GRC"
+ },
+ "29343": {
+  "pais": "Tailândia",
+  "iso3": "THA"
+ },
+ "29351": {
+  "pais": "Espanha",
+  "iso3": "ESP"
+ },
+ "29360": {
+  "pais": "Líbano",
+  "iso3": "LBN"
+ },
+ "29378": {
+  "pais": "Sérvia",
+  "iso3": "SRB"
+ },
+ "29386": {
+  "pais": "Alemanha",
+  "iso3": "DEU"
+ },
+ "29394": {
+  "pais": "Guiné Bissau",
+  "iso3": "GNB"
+ },
+ "29408": {
+  "pais": "Colômbia",
+  "iso3": "COL"
+ },
+ "29416": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "29424": {
+  "pais": "Barbados",
+  "iso3": "BRB"
+ },
+ "29432": {
+  "pais": "Bélgica",
+  "iso3": "BEL"
+ },
+ "29440": {
+  "pais": "Romênia",
+  "iso3": "ROU"
+ },
+ "29459": {
+  "pais": "Hungria",
+  "iso3": "HUN"
+ },
+ "29467": {
+  "pais": "Argentina",
+  "iso3": "ARG"
+ },
+ "29475": {
+  "pais": "Guiana Francesa",
+  "iso3": "GUY"
+ },
+ "29483": {
+  "pais": "Egito",
+  "iso3": "EGY"
+ },
+ "29491": {
+  "pais": "Austrália",
+  "iso3": "AUS"
+ },
+ "29505": {
+  "pais": "Venezuela",
+  "iso3": "VEN"
+ },
+ "29513": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "29521": {
+  "pais": "Uruguai",
+  "iso3": "URY"
+ },
+ "29530": {
+  "pais": "África do Sul",
+  "iso3": "ZAF"
+ },
+ "29548": {
+  "pais": "Cingapura",
+  "iso3": "SGP"
+ },
+ "29556": {
+  "pais": "Paraguai",
+  "iso3": "PRY"
+ },
+ "29564": {
+  "pais": "Venezuela",
+  "iso3": "VEN"
+ },
+ "29572": {
+  "pais": "Bolívia",
+  "iso3": "BOL"
+ },
+ "29580": {
+  "pais": "Paraguai",
+  "iso3": "PRY"
+ },
+ "29599": {
+  "pais": "Dinamarca",
+  "iso3": "DNK"
+ },
+ "29602": {
+  "pais": "Argentina",
+  "iso3": "ARG"
+ },
+ "29610": {
+  "pais": "Senegal",
+  "iso3": "SEN"
+ },
+ "29629": {
+  "pais": "Bangladesh",
+  "iso3": "BGD"
+ },
+ "29637": {
+  "pais": "Síria",
+  "iso3": "SYR"
+ },
+ "29645": {
+  "pais": "Timor Leste",
+  "iso3": "TLS"
+ },
+ "29653": {
+  "pais": "Catar",
+  "iso3": "QAT"
+ },
+ "29661": {
+  "pais": "Irlanda",
+  "iso3": "IRL"
+ },
+ "29670": {
+  "pais": "Paraguai",
+  "iso3": "PRY"
+ },
+ "29688": {
+  "pais": "Suécia",
+  "iso3": "SWE"
+ },
+ "29696": {
+  "pais": "Alemanha",
+  "iso3": "DEU"
+ },
+ "29700": {
+  "pais": "Suíça",
+  "iso3": "CHE"
+ },
+ "29718": {
+  "pais": "Guiana",
+  "iso3": "GUY"
+ },
+ "29742": {
+  "pais": "Japão",
+  "iso3": "JPN"
+ },
+ "29750": {
+  "pais": "Vietnã",
+  "iso3": "VNM"
+ },
+ "29769": {
+  "pais": "Zimbábue",
+  "iso3": "ZWE"
+ },
+ "29777": {
+  "pais": "Cuba",
+  "iso3": "CUB"
+ },
+ "29785": {
+  "pais": "Finlândia",
+  "iso3": "FIN"
+ },
+ "29793": {
+  "pais": "China",
+  "iso3": "CHN"
+ },
+ "29807": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "29815": {
+  "pais": "Camarões",
+  "iso3": "CMR"
+ },
+ "29823": {
+  "pais": "Peru",
+  "iso3": "PER"
+ },
+ "29831": {
+  "pais": "Paquistão",
+  "iso3": "PAK"
+ },
+ "29840": {
+  "pais": "Indonésia",
+  "iso3": "IDN"
+ },
+ "29858": {
+  "pais": "Ucrânia",
+  "iso3": "UKR"
+ },
+ "29874": {
+  "pais": "República Democrática do Congo",
+  "iso3": "COD"
+ },
+ "29882": {
+  "pais": "Kuwait",
+  "iso3": "KWT"
+ },
+ "29890": {
+  "pais": "Malásia",
+  "iso3": "MYS"
+ },
+ "29904": {
+  "pais": "Bolívia",
+  "iso3": "BOL"
+ },
+ "29912": {
+  "pais": "Nigéria",
+  "iso3": "NGA"
+ },
+ "29939": {
+  "pais": "Gabão",
+  "iso3": "GAB"
+ },
+ "29947": {
+  "pais": "Peru",
+  "iso3": "PER"
+ },
+ "29955": {
+  "pais": "Portugal",
+  "iso3": "PRT"
+ },
+ "29963": {
+  "pais": "Togo",
+  "iso3": "TGO"
+ },
+ "29971": {
+  "pais": "Reino Unido",
+  "iso3": "GBR"
+ },
+ "29980": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "29998": {
+  "pais": "Angola",
+  "iso3": "AGO"
+ },
+ "30066": {
+  "pais": "Espanha",
+  "iso3": "ESP"
+ },
+ "30074": {
+  "pais": "Nicarágua",
+  "iso3": "NIC"
+ },
+ "30082": {
+  "pais": "Filipinas",
+  "iso3": "PHL"
+ },
+ "30090": {
+  "pais": "Moçambique",
+  "iso3": "MOZ"
+ },
+ "30104": {
+  "pais": "México",
+  "iso3": "MEX"
+ },
+ "30112": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "30120": {
+  "pais": "Itália",
+  "iso3": "ITA"
+ },
+ "30147": {
+  "pais": "Uruguai",
+  "iso3": "URY"
+ },
+ "30155": {
+  "pais": "Canadá",
+  "iso3": "CAN"
+ },
+ "30163": {
+  "pais": "Rússia",
+  "iso3": "RUS"
+ },
+ "30171": {
+  "pais": "Índia",
+  "iso3": "IND"
+ },
+ "30180": {
+  "pais": "Alemanha",
+  "iso3": "DEU"
+ },
+ "30198": {
+  "pais": "Japão",
+  "iso3": "JPN"
+ },
+ "30201": {
+  "pais": "Quênia",
+  "iso3": "KEN"
+ },
+ "30210": {
+  "pais": "Índia",
+  "iso3": "IND"
+ },
+ "30228": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "30244": {
+  "pais": "Noruega",
+  "iso3": "NOR"
+ },
+ "30252": {
+  "pais": "Canadá",
+  "iso3": "CAN"
+ },
+ "30260": {
+  "pais": "Panamá",
+  "iso3": "PAN"
+ },
+ "30279": {
+  "pais": "Suriname",
+  "iso3": "SUR"
+ },
+ "30287": {
+  "pais": "França",
+  "iso3": "FRA"
+ },
+ "30295": {
+  "pais": "Argentina",
+  "iso3": "ARG"
+ },
+ "30309": {
+  "pais": "Paraguai",
+  "iso3": "PRY"
+ },
+ "30317": {
+  "pais": "China",
+  "iso3": "CHN"
+ },
+ "30325": {
+  "pais": "Trinidade e Tobago",
+  "iso3": "TTO"
+ },
+ "30333": {
+  "pais": "Haiti",
+  "iso3": "HTI"
+ },
+ "30341": {
+  "pais": "Portugal",
+  "iso3": "PRT"
+ },
+ "30350": {
+  "pais": "República Tcheca",
+  "iso3": "CZE"
+ },
+ "30368": {
+  "pais": "Cabo Verde",
+  "iso3": "CPV"
+ },
+ "30376": {
+  "pais": "África do Sul",
+  "iso3": "ZAF"
+ },
+ "30392": {
+  "pais": "Equador",
+  "iso3": "ECU"
+ },
+ "30406": {
+  "pais": "Marrocos",
+  "iso3": "MAR"
+ },
+ "30414": {
+  "pais": "Palestina",
+  "iso3": "PSE"
+ },
+ "30422": {
+  "pais": "Arábia Saudita",
+  "iso3": "SAU"
+ },
+ "30430": {
+  "pais": "Uruguai",
+  "iso3": "URY"
+ },
+ "30449": {
+  "pais": "Itália",
+  "iso3": "ITA"
+ },
+ "30457": {
+  "pais": "Holanda",
+  "iso3": "NLD"
+ },
+ "30465": {
+  "pais": "Paraguai",
+  "iso3": "PRY"
+ },
+ "30473": {
+  "pais": "Bolívia",
+  "iso3": "BOL"
+ },
+ "30481": {
+  "pais": "Chile",
+  "iso3": "CHL"
+ },
+ "30490": {
+  "pais": "República Dominicana",
+  "iso3": "DOM"
+ },
+ "30503": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "30511": {
+  "pais": "Costa Rica",
+  "iso3": "CRI"
+ },
+ "30520": {
+  "pais": "El Salvador",
+  "iso3": "SLV"
+ },
+ "30538": {
+  "pais": "Coréia do Sul",
+  "iso3": "KOR"
+ },
+ "30546": {
+  "pais": "Bulgária",
+  "iso3": "BGR"
+ },
+ "30562": {
+  "pais": "Austrália",
+  "iso3": "AUS"
+ },
+ "30570": {
+  "pais": "China (Taiwan)",
+  "iso3": "TWN"
+ },
+ "30597": {
+  "pais": "Irã",
+  "iso3": "IRN"
+ },
+ "30600": {
+  "pais": "Honduras",
+  "iso3": "HND"
+ },
+ "30619": {
+  "pais": "Israel",
+  "iso3": "ISR"
+ },
+ "30627": {
+  "pais": "Japão",
+  "iso3": "JPN"
+ },
+ "30635": {
+  "pais": "Canadá",
+  "iso3": "CAN"
+ },
+ "30651": {
+  "pais": "China",
+  "iso3": "CHN"
+ },
+ "30669": {
+  "pais": "Botsuana",
+  "iso3": "BWA"
+ },
+ "30686": {
+  "pais": "Líbia",
+  "iso3": "LBY"
+ },
+ "30708": {
+  "pais": "Tunísia",
+  "iso3": "TUN"
+ },
+ "30740": {
+  "pais": "Polônia",
+  "iso3": "POL"
+ },
+ "30767": {
+  "pais": "Áustria",
+  "iso3": "AUT"
+ },
+ "30783": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "30805": {
+  "pais": "Nova Zelândia",
+  "iso3": "NZL"
+ },
+ "30821": {
+  "pais": "Namíbia",
+  "iso3": "NAM"
+ },
+ "30848": {
+  "pais": "China",
+  "iso3": "CHN"
+ },
+ "30864": {
+  "pais": "Suíça",
+  "iso3": "CHE"
+ },
+ "30902": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "30929": {
+  "pais": "Sri Lanka",
+  "iso3": "LKA"
+ },
+ "30961": {
+  "pais": "Portugal",
+  "iso3": "PRT"
+ },
+ "30988": {
+  "pais": "Bósnia-Herzegovina",
+  "iso3": "BIH"
+ },
+ "38881": {
+  "pais": "Belize",
+  "iso3": "BLZ"
+ },
+ "38903": {
+  "pais": "Guiné",
+  "iso3": "GIN"
+ },
+ "38920": {
+  "pais": "Benim",
+  "iso3": "BEN"
+ },
+ "38962": {
+  "pais": "Tanzânia",
+  "iso3": "TZA"
+ },
+ "38989": {
+  "pais": "Armênia",
+  "iso3": "ARM"
+ },
+ "39004": {
+  "pais": "Argentina",
+  "iso3": "ARG"
+ },
+ "39020": {
+  "pais": "Croácia",
+  "iso3": "HRV"
+ },
+ "39063": {
+  "pais": "Canadá",
+  "iso3": "CAN"
+ },
+ "39080": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "39102": {
+  "pais": "Omã",
+  "iso3": "OMN"
+ },
+ "39128": {
+  "pais": "Azerbaijão",
+  "iso3": "AZE"
+ },
+ "39160": {
+  "pais": "Eslovênia",
+  "iso3": "SVN"
+ },
+ "39187": {
+  "pais": "Congo",
+  "iso3": "COG"
+ },
+ "39209": {
+  "pais": "Eslováquia",
+  "iso3": "SVK"
+ },
+ "39225": {
+  "pais": "São Tomé e Príncipe",
+  "iso3": "STP"
+ },
+ "39241": {
+  "pais": "Cazaquistão",
+  "iso3": "KAZ"
+ },
+ "39263": {
+  "pais": "Guiné Equatorial",
+  "iso3": "GNQ"
+ },
+ "39284": {
+  "pais": "Burkina Faso",
+  "iso3": "BFA"
+ },
+ "39306": {
+  "pais": "Turquia",
+  "iso3": "TUR"
+ },
+ "39322": {
+  "pais": "Chipre",
+  "iso3": "CYP"
+ },
+ "98000": {
+  "pais": "Guatemala",
+  "iso3": "GTM"
+ },
+ "99104": {
+  "pais": "Geórgia",
+  "iso3": "GEO"
+ },
+ "99139": {
+  "pais": "Albânia",
+  "iso3": "ALB"
+ },
+ "99147": {
+  "pais": "Antígua e Barbuda",
+  "iso3": "ATG"
+ },
+ "99155": {
+  "pais": "Argentina",
+  "iso3": "ARG"
+ },
+ "99171": {
+  "pais": "Iraque",
+  "iso3": "IRQ"
+ },
+ "99180": {
+  "pais": "Bahamas",
+  "iso3": "BHS"
+ },
+ "99198": {
+  "pais": "Nigéria",
+  "iso3": "NGA"
+ },
+ "99210": {
+  "pais": "Bolívia",
+  "iso3": "BOL"
+ },
+ "99236": {
+  "pais": "Bolívia",
+  "iso3": "BOL"
+ },
+ "99244": {
+  "pais": "Uruguai",
+  "iso3": "URY"
+ },
+ "99279": {
+  "pais": "Venezuela",
+  "iso3": "VEN"
+ },
+ "99287": {
+  "pais": "Zâmbia",
+  "iso3": "ZMB"
+ },
+ "99295": {
+  "pais": "Coreia do Norte",
+  "iso3": "PRK"
+ },
+ "99317": {
+  "pais": "Estônia",
+  "iso3": "EST"
+ },
+ "99325": {
+  "pais": "Etiópia",
+  "iso3": "ETH"
+ },
+ "99333": {
+  "pais": "Guiana Francesa",
+  "iso3": "GUY"
+ },
+ "99341": {
+  "pais": "Malauí",
+  "iso3": "MWI"
+ },
+ "99350": {
+  "pais": "Mali",
+  "iso3": "MLI"
+ },
+ "99376": {
+  "pais": "Myanmar",
+  "iso3": "MMR"
+ },
+ "99384": {
+  "pais": "Santa Lúcia",
+  "iso3": "LCA"
+ },
+ "99430": {
+  "pais": "Jamaica",
+  "iso3": "JAM"
+ },
+ "99473": {
+  "pais": "Bahrein",
+  "iso3": "BHR"
+ },
+ "99490": {
+  "pais": "Estados Unidos",
+  "iso3": "USA"
+ },
+ "99503": {
+  "pais": "Reino Unido",
+  "iso3": "GBR"
+ },
+ "99511": {
+  "pais": "França",
+  "iso3": "FRA"
+ }
+}

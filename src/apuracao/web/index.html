@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Apuração 2026 · 2º turno</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <header class="topo">
+    <div>
+      <div class="eyebrow">Painel local · 2º turno presidencial · 25/10/2026</div>
+      <h1>Apuração ao vivo</h1>
+    </div>
+    <div class="topo-dir">
+      <span id="status" class="pill">carregando…</span>
+      <span id="atualizado" class="muted"></span>
+    </div>
+  </header>
+
+  <main>
+    <section class="card" id="placar-card">
+      <div class="card-cab"><h2 id="placar-titulo">Brasil · totalização oficial do TSE</h2><span id="placar-apurado" class="muted"></span></div>
+      <div class="placar">
+        <div class="lado lula"><div class="nome">Lula <span class="num">13</span></div><div class="pct" id="p-lula">—</div><div class="votos" id="v-lula"></div></div>
+        <div class="lado flavio"><div class="nome">Flávio <span class="num">22</span></div><div class="pct" id="p-flavio">—</div><div class="votos" id="v-flavio"></div></div>
+      </div>
+      <div class="barra"><div class="b-lula" id="b-lula"></div><div class="b-flavio" id="b-flavio"></div><div class="meio"></div></div>
+      <div class="kpis" id="kpis-placar"></div>
+      <p class="aviso" id="placar-aviso"></p>
+    </section>
+
+    <section class="grid2">
+      <div class="card proj" id="proj-2022"></div>
+      <div class="card proj" id="proj-1t"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-cab"><h2>Nas mesmas urnas já apuradas</h2><span class="muted">mesmos municípios, na mesma proporção apurada</span></div>
+      <div id="mesmas"></div>
+    </section>
+
+    <section class="card">
+      <div class="card-cab"><h2>Lula entre os válidos ao longo da apuração</h2><span class="muted" id="serie-sub"></span></div>
+      <div id="serie" class="grafico"></div>
+    </section>
+
+    <section class="card" id="exterior-card">
+      <div class="card-cab"><h2>Exterior · boletins de urna seção a seção</h2><span id="ext-sub" class="muted"></span></div>
+      <div class="kpis" id="kpis-ext"></div>
+      <div id="ext-mesmas"></div>
+      <div id="ext-proj" class="ext-proj proj"></div>
+      <h3>Lula entre os válidos no exterior, por boletim recebido</h3>
+      <div id="ext-serie" class="grafico"></div>
+      <h3>Por país</h3>
+      <div class="tabela-wrap"><table id="ext-tabela"></table></div>
+    </section>
+
+    <section class="card">
+      <div class="card-cab"><h2>Por estado</h2><span class="muted">percentuais de Lula entre os válidos (2 candidatos)</span></div>
+      <div class="tabela-wrap"><table id="uf-tabela"></table></div>
+    </section>
+
+    <section class="card">
+      <div class="card-cab"><h2>Coleta</h2><span class="muted" id="coleta-sub"></span></div>
+      <ul id="eventos" class="eventos"></ul>
+    </section>
+  </main>
+  <footer>Dados: resultados.tse.jus.br e dados abertos do TSE. Projeções são estimativas estatísticas e podem errar.</footer>
+  <div id="tooltip" class="tooltip" hidden></div>
+  <script src="app.js"></script>
+</body>
+</html>
