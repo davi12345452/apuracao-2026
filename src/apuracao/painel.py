@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 
@@ -289,11 +289,25 @@ def _r(x, d=1):
     return None if x is None or not np.isfinite(x) else round(float(x), d)
 
 
-def _refs_bu(ctx: Ctx, r: dict, bu1: dict) -> dict:
-    """Referências de um BU do 2º turno: 1º turno (mesma seção ou média da cidade) e 2º turno 2022 (cidade)."""
+def _secao_2022(db: DB) -> dict[tuple, dict]:
+    """2º turno 2022 por seção do exterior (scripts/baixar_secao_2022.py); vazio se a tabela não existe."""
+    try:
+        return {(r["mun"], r["zona"], r["secao"]): r for r in db.query("SELECT * FROM secao_2022")}
+    except Exception:  # noqa: BLE001 - tabela opcional
+        return {}
+
+
+def _refs_bu(ctx: Ctx, r: dict, bu1: dict, s22: dict | None = None) -> dict:
+    """Referências de um BU do 2º turno: 1º turno 2026 e 2º turno 2022, cada um na mesma seção quando ela
+    existe na outra eleição (chave município+zona+seção) e, só senão, na média da cidade."""
     i = ctx.idx.get(("zz", r["mun"]))
     out: dict = {"cidade": "", "pais": "", "lula_1t": None, "abst_1t": None, "ref_1t": None,
-                 "lula_2022": None, "abst_2022": None}
+                 "lula_2022": None, "abst_2022": None, "ref_2022": None}
+    s = (s22 or {}).get((r["mun"], r["zona"], r["secao"]))
+    if s and (s["lula"] + s["bolsonaro"]) > 0 and s["aptos"]:
+        out["lula_2022"] = 100 * s["lula"] / (s["lula"] + s["bolsonaro"])
+        out["abst_2022"] = 100 * (s["aptos"] - s["comparecimento"]) / s["aptos"]
+        out["ref_2022"] = "secao"
     if i is not None:
         out["cidade"], out["pais"] = ctx.nome[i].title(), str(ctx.pais[i]) or "?"
     s = bu1.get((r["mun"], r["zona"], r["secao"]))
@@ -307,21 +321,64 @@ def _refs_bu(ctx: Ctx, r: dict, bu1: dict) -> dict:
             out["lula_1t"] = 100 * b["lula"][i] / (b["lula"][i] + b["direita"][i])
             out["abst_1t"] = 100 * (b["aptos"][i] - b["comparecimento"][i]) / b["aptos"][i]
             out["ref_1t"] = "cidade"
-    if i is not None:
+    if i is not None and out["ref_2022"] is None:
         b = ctx.B["2022_2t"]
         if b["tem"][i] and b["lula"][i] + b["direita"][i] > 0 and b["aptos"][i] > 0:
             out["lula_2022"] = 100 * b["lula"][i] / (b["lula"][i] + b["direita"][i])
             out["abst_2022"] = 100 * (b["aptos"][i] - b["comparecimento"][i]) / b["aptos"][i]
+            out["ref_2022"] = "cidade"
+    return out
+
+
+def placar_exterior(ctx: Ctx, agora: datetime | None = None) -> dict:
+    """Números brutos do exterior: apurado, votos, crescimento nas MESMAS seções contra o 1º turno 2026 e
+    o 2º turno 2022 (só seções que casam por município+zona+seção) e o que entrou na última hora."""
+    bu1, s22 = _bu_1t(ctx.db), _secao_2022(ctx.db)
+    rows = ctx.bu_rows
+    soma = lambda rs, c: int(sum(r[c] for r in rs))  # noqa: E731
+    b1 = ctx.B["2026_1t"]
+    eleitorado = 0
+    for i in np.where(ctx.ext)[0]:
+        eleitorado += int((ctx.ab.get(ctx.chaves[i]) or {}).get("eleitorado") or b1["aptos"][i])
+    out = {
+        "secoes": len(rows), "secoes_tot": int(sum(ctx.secoes_cidade.values())),
+        "eleitores": soma(rows, "aptos"), "eleitorado": eleitorado,
+        "comparecimento": soma(rows, "comparecimento"),
+        "lula": soma(rows, "lula"), "flavio": soma(rows, "flavio"),
+        "brancos": soma(rows, "brancos"), "nulos": soma(rows, "nulos"),
+    }
+    out["validos"] = out["lula"] + out["flavio"]
+    out["saldo"] = out["lula"] - out["flavio"]
+    # mesmas seções: agora × antes, só as que casam
+    k = lambda r: (r["mun"], r["zona"], r["secao"])  # noqa: E731
+    m1 = [(r, bu1[k(r)]) for r in rows if k(r) in bu1]
+    m22 = [(r, s22[k(r)]) for r in rows if k(r) in s22]
+    sm = lambda ps, j, c: int(sum(p[j][c] for p in ps))  # noqa: E731
+    out["vs_1t"] = {"secoes": len(m1),
+                    "lula": sm(m1, 0, "lula"), "lula_antes": sm(m1, 1, "lula"),
+                    "flavio": sm(m1, 0, "flavio"), "flavio_antes": sm(m1, 1, "flavio"),
+                    "comparecimento": sm(m1, 0, "comparecimento"), "comparecimento_antes": sm(m1, 1, "comparecimento"),
+                    "aptos": sm(m1, 0, "aptos"), "aptos_antes": sm(m1, 1, "aptos")}
+    out["vs_2022"] = {"secoes": len(m22),
+                      "lula": sm(m22, 0, "lula"), "lula_antes": sm(m22, 1, "lula"),
+                      "flavio": sm(m22, 0, "flavio"), "flavio_antes": sm(m22, 1, "bolsonaro"),
+                      "comparecimento": sm(m22, 0, "comparecimento"), "comparecimento_antes": sm(m22, 1, "comparecimento"),
+                      "aptos": sm(m22, 0, "aptos"), "aptos_antes": sm(m22, 1, "aptos")}
+    # última hora, pela hora em que o TSE recebeu
+    corte = ((agora or datetime.now()) - timedelta(hours=1)).isoformat(timespec="seconds")
+    uh = [r for r in rows if _quando(r) >= corte]
+    out["ultima_hora"] = {"secoes": len(uh), "lula": soma(uh, "lula"), "flavio": soma(uh, "flavio"),
+                          "comparecimento": soma(uh, "comparecimento")}
     return out
 
 
 def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int = 10) -> tuple[list[dict], list[dict]]:
     """Os boletins mais recentes do exterior (mais novo primeiro) e as chegadas em janelas de 10 min,
     cada um comparado com o 1º turno (mesma seção quando há, senão média da cidade) e com 2022 (cidade)."""
-    bu1 = _bu_1t(ctx.db)
+    bu1, s22 = _bu_1t(ctx.db), _secao_2022(ctx.db)
     linhas = []
     for r in ctx.bu_rows:
-        ref = _refs_bu(ctx, r, bu1)
+        ref = _refs_bu(ctx, r, bu1, s22)
         v2 = r["lula"] + r["flavio"]
         lula = 100 * r["lula"] / v2 if v2 else None
         abst = 100 * (r["aptos"] - r["comparecimento"]) / r["aptos"] if r["aptos"] else None
@@ -333,7 +390,7 @@ def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int 
             "brancos": r["brancos"], "nulos": r["nulos"], "lula_pct": lula, "abstencao_pct": abst,
             "ref_1t": ref["ref_1t"], "lula_1t_pct": ref["lula_1t"], "abstencao_1t_pct": ref["abst_1t"],
             "d_lula_1t": dif(lula, ref["lula_1t"]), "d_abst_1t": dif(abst, ref["abst_1t"]),
-            "lula_2022_pct": ref["lula_2022"], "abstencao_2022_pct": ref["abst_2022"],
+            "lula_2022_pct": ref["lula_2022"], "abstencao_2022_pct": ref["abst_2022"], "ref_2022": ref["ref_2022"],
             "d_lula_2022": dif(lula, ref["lula_2022"]), "d_abst_2022": dif(abst, ref["abst_2022"]),
         })
     # lotes: janelas de 10 min pela hora de recebimento no TSE
@@ -698,6 +755,7 @@ def estado(db: DB) -> dict:
     ext["ultimo_bu"] = _quando(ctx.bu_rows[-1]) if ctx.bu_rows else None
     try:
         ext["recentes"], ext["lotes"] = recentes_exterior(ctx)
+        ext["placar"] = placar_exterior(ctx)
     except Exception as e:  # noqa: BLE001 - o painel segue sem o feed
         db.log("aviso", f"recentes do exterior: {e!r}")
         ext["recentes"], ext["lotes"] = [], []

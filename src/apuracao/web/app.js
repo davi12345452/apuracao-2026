@@ -480,30 +480,78 @@ function renderFeedExterior(est) {
     <span class="sep">·</span> <b>Lula × Flávio: Lula ${fmtP(L.lula_pct)}</b> <span class="muted">(no 1º turno ${ref1}: ${fmtP(L.lula_1t_pct)})</span>
     <span class="sep">·</span> abstenção <b>${fmtP(L.abstencao_pct, 0)}</b> <span class="muted">(1º turno: ${fmtP(L.abstencao_1t_pct, 0)})</span>
     ${nNovos ? `<span class="fx-novos">${nNovos} ${nNovos === 1 ? "novo" : "novos"} desde a última atualização</span>` : ""}</div>` : "";
-  // ---------- boletins ----------
-  const linhas = rec.map((r) => {
-    const v = r.lula + r.flavio, pl = r.lula_pct;
-    const ref = r.ref_1t === "secao" ? "mesma seção" : r.ref_1t === "cidade" ? "média da cidade" : "";
+  renderPlacarExterior(x.placar);
+  // ---------- boletins: os 10 mais recentes, o resto ao expandir (sem rolagem interna) ----------
+  const N_BU = 10, N_LOTES = 6;
+  const recVis = expandido["fx-bu"] ? rec : rec.slice(0, N_BU);
+  const linhas = recVis.map((r) => {
+    const pl = r.lula_pct;
+    // padrão: mesma seção, sem rótulo; o rótulo só aparece na exceção (média da cidade)
+    const cid1 = r.ref_1t === "cidade", cid22 = r.ref_2022 === "cidade";
     return `<div class="fx-bu ${novo(r) ? "novo" : ""}">
       <span class="fx-h">${hora(r.t)}${novo(r) ? `<em>novo</em>` : ""}</span>
       <span class="fx-onde"><b>${esc(r.cidade)}</b><small>${esc(r.pais)} · zona ${+r.zona} · seção ${+r.secao}</small></span>
       <span class="fx-duelo">${pl == null ? `<span class="muted">sem votos válidos</span>` : `<span class="nums"><span>${marca("l")}Lula <b>${fmtP(par(pl)[0], 0)}</b></span><span>Flávio <b>${fmtP(par(pl)[1], 0)}</b>${marca("f")}</span></span>
         <span class="t"><i class="bl" style="width:${pl}%"></i><i class="bf"></i></span>
         <small>${fmtN(r.lula)} × ${fmtN(r.flavio)} · ${fmtN(r.brancos)} br. · ${fmtN(r.nulos)} nulos</small>`}</span>
-      <span class="fx-abst"><small>abstenção</small><b>${fmtP(r.abstencao_pct, 0)}</b><small>1º t. ${fmtP(r.abstencao_1t_pct, 0)}</small></span>
+      <span class="fx-abst"><small>abstenção</small><b>${fmtP(r.abstencao_pct, 0)}</b><small>1º t. ${fmtP(r.abstencao_1t_pct, 0)}${cid1 ? "*" : ""}</small></span>
       <span class="fx-chips">
-        ${chipComp(`1º turno · ${ref || "—"}`, r.d_lula_1t, `Lula entre Lula e Flávio: ${fmtP(pl)} agora × ${fmtP(r.lula_1t_pct)} no 1º turno (${ref}). Abstenção: ${fmtP(r.abstencao_pct)} × ${fmtP(r.abstencao_1t_pct)}.`)}
-        ${chipComp("2022 · cidade", r.d_lula_2022, `Lula × Bolsonaro no 2º turno de 2022 na cidade: ${fmtP(r.lula_2022_pct)}. Abstenção em 2022: ${fmtP(r.abstencao_2022_pct)}.`)}
+        ${chipComp(`1º turno${cid1 ? " · média da cidade" : ""}`, r.d_lula_1t, `Lula entre Lula e Flávio: ${fmtP(pl)} agora × ${fmtP(r.lula_1t_pct)} no 1º turno (${cid1 ? "média da cidade: seção sem boletim no 1º turno" : "mesma seção"}). Abstenção: ${fmtP(r.abstencao_pct)} × ${fmtP(r.abstencao_1t_pct)}.`)}
+        ${chipComp(`2022${cid22 ? " · média da cidade" : ""}`, r.d_lula_2022, `Lula × Bolsonaro no 2º turno de 2022 (${cid22 ? "média da cidade: seção não existia em 2022" : "mesma seção"}): ${fmtP(r.lula_2022_pct)}. Abstenção em 2022: ${fmtP(r.abstencao_2022_pct)}.`)}
       </span></div>`;
   }).join("");
+  const maisBU = rec.length > N_BU ? `<button class="mais" data-exp="fx-bu">${expandido["fx-bu"] ? "Ver só os 10 mais recentes" : `Ver mais (${rec.length} mais recentes)`}</button>` : "";
   // ---------- lotes ----------
+  const lotesVis = expandido["fx-lotes"] ? lotes : lotes.slice(0, N_LOTES);
+  const maisLotes = lotes.length > N_LOTES ? `<button class="mais" data-exp="fx-lotes">${expandido["fx-lotes"] ? "Ver menos" : `Ver mais (${lotes.length})`}</button>` : "";
   const tabLotes = `<table class="tabela fx-lotes"><thead><tr><th>Chegada</th><th>Bol.</th><th>Lula</th><th>× 1º turno</th><th>Abst.</th></tr></thead><tbody>` +
-    lotes.map((l) => `<tr><td><b>${hora(l.de)}</b><small>${esc(listaPaises(l.paises, 2))}</small></td><td>${l.boletins}</td>
+    lotesVis.map((l) => `<tr><td><b>${hora(l.de)}</b><small>${esc(listaPaises(l.paises, 2))}</small></td><td>${l.boletins}</td>
       <td>${fmtP(l.lula_pct, 1)}</td><td>${fmtDelta(l.lula_pct != null && l.lula_1t_pct != null ? l.lula_pct - l.lula_1t_pct : null, 1, true)}</td>
       <td>${fmtP(l.abstencao_pct, 0)}<small>1º t. ${fmtP(l.abstencao_1t_pct, 0)}</small></td></tr>`).join("") + `</tbody></table>`;
-  $("feed").innerHTML = `${resumo}<div class="fx-grade"><div class="fx-lista">${linhas}</div>
-    <div class="fx-lado"><div class="sub-h">Chegadas a cada 10 min</div><div class="tabela-wrap">${tabLotes}</div>
-    <p class="nota-leitura">Lula entre Lula e Flávio. 1º turno: mesma seção quando o boletim dela foi baixado; senão, média da cidade (ponderada pelos votos que chegaram).</p></div></div>`;
+  $("feed").innerHTML = `${resumo}<div class="fx-grade"><div><div class="fx-lista">${linhas}</div>${maisBU}</div>
+    <div class="fx-lado"><div class="sub-h">Chegadas a cada 10 min</div><div class="fx-tab">${tabLotes}</div>${maisLotes}
+    <p class="nota-leitura">Lula entre Lula e Flávio. Comparação com a mesma seção no 1º turno e em 2022; "média da cidade" (e *) só quando a seção não existia na outra eleição.</p></div></div>`;
+}
+
+// placar do exterior em números brutos, no topo da aba (inserido antes do mapa; só aparece na aba Exterior)
+function renderPlacarExterior(pl) {
+  let el = $("ext-placar");
+  if (!el) {
+    el = document.createElement("section");
+    el.id = "ext-placar";
+    el.className = "ext-placar";
+    const palco = document.querySelector("#aba-mapa .palco");
+    palco.parentNode.insertBefore(el, palco);
+  }
+  if (!pl) { el.innerHTML = ""; return; }
+  const dif = (a, b) => { const d = a - b; return `<span class="xp-d">${d > 0 ? "+" : d < 0 ? "−" : "±"}${fmtN(Math.abs(d))}</span>`; };
+  const linhaVs = (nome, c, agora, antes, rotAntes) => `<div class="xp-l">${c ? marca(c) : `<i class="mk-m e"></i>`}<span class="n">${nome}</span>
+    <b>${fmtN(agora)}</b><span class="a">${rotAntes} ${fmtN(antes)}</span>${dif(agora, antes)}</div>`;
+  // agora × antes nas seções que existem nas duas eleições (casadas por município+zona+seção)
+  const cmp = (v, titulo, rot, rotF) => `<div class="xp-card"><div class="rot">${titulo}</div>
+    <div class="xp-sub">${fmtN(v.secoes)} de ${fmtN(pl.secoes)} seções apuradas existem nas duas</div>
+    ${linhaVs("Lula", "l", v.lula, v.lula_antes, rot)}${linhaVs("Flávio", "f", v.flavio, v.flavio_antes, rotF)}
+    ${linhaVs("Votaram", "", v.comparecimento, v.comparecimento_antes, rot)}</div>`;
+  const pS = pl.secoes_tot ? (100 * pl.secoes) / pl.secoes_tot : 0, pE = pl.eleitorado ? (100 * pl.eleitores) / pl.eleitorado : 0;
+  const pL = pl.validos ? (100 * pl.lula) / pl.validos : null, uh = pl.ultima_hora || {};
+  const saldoC = pl.saldo > 0 ? "l" : pl.saldo < 0 ? "f" : "";
+  el.innerHTML = `
+    <div class="xp-card"><div class="rot">Apurado no exterior</div>
+      <div class="xp-big">${fmtN(pl.secoes)}<small> de ${fmtN(pl.secoes_tot)} seções</small></div>
+      <div class="xp-trilho"><i style="width:${pS}%"></i></div>
+      <div class="xp-sub">${fmtP(pS)} das seções · ${fmtMi(pl.eleitores)} de ${fmtMi(pl.eleitorado)} eleitores (${fmtP(pE)}) · ${fmtN(pl.comparecimento)} votaram</div></div>
+    <div class="xp-card"><div class="rot">Votos válidos contados</div>
+      <div class="xp-big">${fmtN(pl.validos)}</div>
+      ${pL == null ? "" : `<div class="xp-duelo"><span>${marca("l")}Lula <b>${fmtN(pl.lula)}</b></span><span>Flávio <b>${fmtN(pl.flavio)}</b>${marca("f")}</span></div>
+      <div class="xp-barra"><i class="bl" style="width:${pL}%"></i><i class="bf"></i></div>`}
+      <div class="xp-sub">${saldoC ? `${marca(saldoC)}${NOME_LADO[saldoC]} à frente por <b>${fmtN(Math.abs(pl.saldo))}</b> votos` : "empate"} · ${fmtN(pl.brancos)} brancos · ${fmtN(pl.nulos)} nulos</div></div>
+    ${cmp(pl.vs_1t, "Mesmas seções × 1º turno 2026", "1º t.", "1º t.")}
+    ${cmp(pl.vs_2022, "Mesmas seções × 2º turno 2022", "2022", "Bolsonaro")}
+    <div class="xp-card"><div class="rot">Última hora</div>
+      <div class="xp-big">+${fmtN(uh.secoes)}<small> seções</small></div>
+      <div class="xp-l">${marca("l")}<span class="n">Lula</span><b>+${fmtN(uh.lula)}</b></div>
+      <div class="xp-l">${marca("f")}<span class="n">Flávio</span><b>+${fmtN(uh.flavio)}</b></div>
+      <div class="xp-sub">pela hora em que o TSE recebeu</div></div>`;
 }
 
 // ================================================================ Brasil: feed e análises (agente B)
