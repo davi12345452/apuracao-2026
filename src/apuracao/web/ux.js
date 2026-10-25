@@ -60,6 +60,7 @@ function uxAlvos() {
   const ex = aba === "exterior";
   return [
     ["Resumo", $("hero")],
+    ...(ex || !$("cmp") ? [] : [["Cresceu", $("cmp")]]), // cmp.js
     ["Mapa", document.querySelector(".mapa-card")],
     ["Por quê", $("porque")],
     ["O que falta", $("cascata").closest(".faixa-baixo")],

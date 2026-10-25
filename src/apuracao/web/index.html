@@ -18,6 +18,7 @@
   <link rel="stylesheet" href="app.css">
   <link rel="stylesheet" href="ux.css">
   <link rel="stylesheet" href="virada-ritmo.css">
+  <link rel="stylesheet" href="cmp.css">
 </head>
 <body>
   <header class="topo">
@@ -44,6 +45,9 @@
       <div class="hero" id="hero"></div>
       <!-- virada possível? e ritmo da apuração (virada-ritmo.js) -->
       <div class="vr-bloco" id="vr-bloco" hidden></div>
+
+      <!-- quanto cada um cresceu: 2022 → 1º turno → agora, com filtro de estados e regiões (cmp.js) -->
+      <section class="painel cmp" id="cmp" hidden></section>
 
       <div class="corpo">
         <div class="principal">
@@ -155,5 +159,6 @@
   <script src="app.js"></script>
   <script src="ux.js"></script>
   <script src="virada-ritmo.js"></script>
+  <script src="cmp.js"></script>
 </body>
 </html>

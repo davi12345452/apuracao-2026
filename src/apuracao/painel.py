@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 import numpy as np
 
-from . import movimentos, tse
+from . import comparacao, movimentos, tse
 from .db import DB
 from .projecao import MIN_APURADO, Unidades, projetar
 
@@ -931,6 +931,10 @@ def estado(db: DB) -> dict:
                                "abstencao_1t_pct": c["2026_1t"]["abstencao_pct"],
                                "abstencao_2022_pct": c["2022_2t"]["abstencao_pct"]})
             brasil["por_uf"] = por_uf
+            try:  # vai para /api/comparacao (o servidor tira do /api/estado)
+                out["_comparacao"] = comparacao.montar(ctx, u)
+            except Exception as e:  # noqa: BLE001 - o painel segue sem a comparação
+                db.log("aviso", f"comparacao: {e!r}")
             if apurando:
                 try:
                     brasil["analise"] = analise_brasil(ctx, u, p)

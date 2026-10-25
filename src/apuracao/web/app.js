@@ -1468,6 +1468,7 @@ function render(est) {
     if (typeof renderViradaRitmo === "function") renderViradaRitmo(est, aba);
     renderMapa(est);
   }
+  if (typeof cmpRender === "function") cmpRender(est, aba); // cmp.js: quanto cada um cresceu
   if (aba === "mercados") renderMercados(est);
   if (aba === "coleta") renderColeta(est);
   if (typeof uxDepois === "function") uxDepois(est); // mini-placar, atalhos e "desde a última olhada" (ux.js)

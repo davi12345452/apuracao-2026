@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 import os
 from urllib.parse import unquote
 import json
@@ -51,6 +52,9 @@ class Estado:
         self.fixos = b"[]"  # nome, UF, eleitorado e 1º turno dos municípios: o navegador baixa uma vez só
         self.fixos_gz = gzip.compress(self.fixos)
         self.ultimo: dict | None = None
+        self.cmp = b"{}"  # comparação por estado (2022 × 1º turno × agora) e a curva da noite
+        self.cmp_gz = gzip.compress(self.cmp)
+        self.cmp_etag = '"0"'
 
     def vigiar(self, intervalo: float = 60.0) -> None:
         """Avisos do Telegram (só quando ligados por APURACAO_ALERTAS)."""
@@ -78,6 +82,12 @@ class Estado:
             if time.monotonic() - self.t > CACHE_S:
                 try:
                     est = estado(self.db)
+                    cmp = est.pop("_comparacao", None)
+                    if cmp is not None:
+                        corpo = json.dumps(cmp, ensure_ascii=False, separators=(",", ":"), default=_json, allow_nan=False).encode()
+                        if corpo != self.cmp:
+                            self.cmp, self.cmp_gz = corpo, gzip.compress(corpo, 6)
+                            self.cmp_etag = '"' + hashlib.sha1(corpo).hexdigest()[:16] + '"'
                     registrar_hist(self.db, est)
                     self.ultimo = est
                     est = self._separar_fixos(est)
@@ -162,6 +172,28 @@ def handler(est: Estado):
                 est.get()
                 gz = self._aceita_gzip()
                 self._enviar(est.fixos_gz if gz else est.fixos, "application/json; charset=utf-8", gz, "no-cache")
+                return
+            if caminho == "/api/comparacao":
+                est.get()
+                if self.headers.get("If-None-Match") == est.cmp_etag:
+                    self.send_response(304)
+                    self.send_header("ETag", est.cmp_etag)
+                    self.send_header("Cache-Control", "no-cache")
+                    self.end_headers()
+                    return
+                gz = self._aceita_gzip()
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("ETag", est.cmp_etag)
+                self.send_header("Vary", "Accept-Encoding")
+                corpo = est.cmp_gz if gz else est.cmp
+                if gz:
+                    self.send_header("Content-Encoding", "gzip")
+                self.send_header("Content-Length", str(len(corpo)))
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(corpo)
                 return
             if caminho.startswith("/api/"):
                 self.send_error(404)
