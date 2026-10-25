@@ -590,3 +590,15 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
 /* feed completo na coluna principal: chegadas a cada 10 min vão para baixo quando falta largura */
 #feed-painel { container-type: inline-size; }
 @container (max-width: 1250px) { .fx-grade { grid-template-columns: minmax(0, 1fr); } .fx-lado { max-width: 640px; } }
+/* cenário do Brasil com as variáveis do exterior */
+.cen-topo { display: grid; grid-template-columns: minmax(260px, auto) 1fr; gap: 24px; align-items: center; margin: 4px 0 14px; }
+.cen-res { display: flex; flex-direction: column; gap: 3px; }
+.cen-res .k { font: 500 10.5px/1.2 var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.cen-res b { font-size: 22px; font-weight: 750; letter-spacing: -.02em; }
+.cen-res b.pct-l { color: var(--lula); } .cen-res b.pct-f { color: var(--flavio); }
+.cen-res small { font-size: 12px; color: var(--text-2); }
+.cen-topo .fl-frase { margin: 0; font-size: 12.5px; }
+.cen-var td:first-child { width: 40%; }
+.cen-t td small { display: block; color: var(--muted); font-size: 11px; }
+.cen-t td.pct-l b { color: var(--lula); } .cen-t td.pct-f b { color: var(--flavio); }
+@media (max-width: 760px) { .cen-topo { grid-template-columns: 1fr; gap: 8px; } }

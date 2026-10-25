@@ -52,6 +52,7 @@ const MODOS = {
   desvio: { rot: "Desvio", cor: corDesvio },
   andamento: { rot: "Andamento", cor: corAndamento },
   t1: { rot: "1º turno", cor: corFatia },
+  cenario: { rot: "Cenário do exterior", cor: corFatia, so: "brasil" },
 };
 function legenda(m) {
   const esc4 = (pref, rots) => rots.map((r, i) => `<span><i style="background:${COR(pref + (i + 1))}"></i>${r}</span>`);
@@ -138,7 +139,7 @@ function pintarBR() {
   const col = { proj: 6, contado: 5, desvio: 7, andamento: 4, t1: 8 }[m];
   svg.querySelectorAll(".m").forEach((p) => {
     const r = MUN[p.dataset.k];
-    const v = r ? r[col] : null;
+    const v = m === "cenario" ? EST?.brasil?.cenario?.mun?.[p.dataset.k] ?? null : r ? r[col] : null;
     p.style.fill = m === "andamento" ? cor(v) : (m === "contado" || m === "desvio") && r && !r[4] ? COR("vazio") : cor(v);
   });
   const u = sel.brasil;
@@ -748,6 +749,49 @@ function brFeed(est) {
   $("feed").innerHTML = h;
 }
 
+// ---- cenário: o Brasil votando com as variáveis do exterior
+function cartaoCenario(c, apurando) {
+  if (!c || !c.brasil) return "";
+  const b = c.brasil, lado = b.lula_pct >= 50 ? "l" : "f", nomeL = lado === "l" ? "Lula" : "Flávio";
+  const dpp = (r) => (r.lula_pct == null || r.lula_1t_pct == null ? null : r.lula_pct - r.lula_1t_pct);
+  const faixas = c.faixas.map((f) => `<tr><td><b>${marca(f.lado)}${f.nome}</b><small>Lula ${f.de === 0 ? `abaixo de ${f.ate}%` : f.ate >= 100 ? `${f.de}% ou mais` : `${f.de}–${f.ate}%`} no 1º turno · ${fmtN(f.secoes)} seções</small></td>
+      <td><b>${fmtP(f.terceira_lula, 0)}</b> / <b>${fmtP(f.terceira_flavio, 0)}</b><small>3ª via → Lula / Flávio</small></td>
+      <td><b>${fmtP(f.novos_lula, 0)}</b> / <b>${fmtP(f.novos_flavio, 0)}</b><small>quem volta a votar → Lula / Flávio</small></td></tr>`).join("");
+  const med = (r) => {
+    const m = r.medido;
+    if (!apurando) return "";
+    if (!m) return `<td class="muted">aguardando</td>`;
+    const d = m.lula_pct - m.lula_1t_pct;
+    return `<td><b>${fmtP(m.lula_pct)}</b><small>${fmtPPs(d)} pp vs 1º t. · ${fmtN(m.municipios)} mun.</small></td>`;
+  };
+  const linha = (r, nome, cls) => `<tr class="${cls}"><td>${nome}</td>
+      <td>${fmtP(r.lula_1t_pct)}</td>
+      <td class="${r.lula_pct >= 50 ? "pct-l" : "pct-f"}"><b>${fmtP(r.lula_pct)}</b><small>${fmtPPs(dpp(r))} pp</small></td>
+      <td><b>${sinalC(r.lula_3via + r.lula_novos)}</b><small>${sinalC(r.lula_3via)} 3ª via · ${sinalC(r.lula_novos)} comparec.</small></td>
+      <td><b>${sinalC(r.flavio_3via + r.flavio_novos)}</b><small>${sinalC(r.flavio_3via)} 3ª via · ${sinalC(r.flavio_novos)} comparec.</small></td>
+      <td>${fmtP(r.abst_1t, 1)} → <b>${fmtP(r.abst, 1)}</b></td>${med(r)}</tr>`;
+  const linhas = c.regioes.map((r) => {
+    const k = `cen-${r.regiao}`, aberto = !!expandido[k];
+    const nome = `<button class="br-abre" data-exp="${k}" aria-expanded="${aberto}"><span class="seta">${aberto ? "−" : "+"}</span>${esc(r.regiao)}</button>`;
+    return linha(r, nome, "br-reg") + (aberto ? r.ufs.map((u) => linha(u, `<span class="br-uf"><span class="nm">${esc(u.nome)} </span><span class="muted">${u.uf}</span></span>`, "br-ufl")).join("") : "");
+  }).join("");
+  return `<section class="painel cen">
+    <header><h2>Cenário: o Brasil votando como o exterior</h2><p>muda a cada boletim do exterior · ${fmtN(c.secoes_exterior)} seções</p></header>
+    <div class="cen-topo">
+      <div class="cen-res"><span class="k">Brasil no cenário</span><b class="${lado === "l" ? "pct-l" : "pct-f"}">Lula ${fmtP(b.lula_pct)} × Flávio ${fmtP(100 - b.lula_pct)}</b>
+        <small>${nomeL} por ${fmtC(Math.abs(b.saldo_lula))} votos · no 1º turno, entre os dois: Lula ${fmtP(b.lula_1t_pct)}</small></div>
+      <p class="fl-frase">Cada município recebe as variáveis que o exterior está medindo para a faixa dele no 1º turno: quanto da 3ª via e de quem volta a votar vai para cada um.
+        A variação do comparecimento é a do próprio município do 1º para o 2º turno de 2022 (a do exterior parte de outra abstenção e não se transfere).</p>
+    </div>
+    <div class="sub-h">As variáveis que o exterior está dando</div>
+    <table class="tabela cr-tab cen-var"><tbody>${faixas}</tbody></table>
+    <div class="sub-h" style="margin-top:14px">Região por região</div>
+    <div class="tabela-wrap"><table class="tabela br-t cen-t"><thead><tr><th>Região</th><th>Lula 1º turno*</th><th>Lula no cenário</th><th>Lula ganha</th><th>Flávio ganha</th><th>Abstenção</th>${apurando ? "<th>Medido agora*</th>" : ""}</tr></thead>
+      <tbody>${linhas}</tbody></table></div>
+    <p class="nota-leitura">* Lula entre os dois. ${apurando ? "Medido agora: municípios com 90% ou mais apurado na região, contra o 1º turno deles. " : ""}O eleitor do exterior não é o do Brasil: isto mostra o que aconteceria se cada tipo de lugar repetisse o comportamento do exterior, não uma previsão. Clique numa região para abrir os estados.</p>
+  </section>`;
+}
+
 // ---- análises: origem dos votos, abstenção, 3ª via
 function brLinhas(a, chave, linha, soContadas = false) {
   // uma linha por região (botão abre as UFs) + UFs quando aberta
@@ -835,7 +879,7 @@ function brTerceira(a, cedo, min) {
 function brAnalise(est) {
   const a = est.brasil?.analise, el = $("porque");
   if (est.fase !== "apurando" || !a || !a.total?.validos) {
-    el.innerHTML = `<section class="painel"><header><h2>Por que cada um cresce</h2><p>aparece às 17h</p></header>
+    el.innerHTML = cartaoCenario(est.brasil?.cenario, false) + `<section class="painel"><header><h2>Por que cada um cresce, medido no Brasil</h2><p>aparece às 17h</p></header>
       <ul class="lista-espera"><li><b>De onde vêm os votos:</b> quanto do contado vem de cada região, comparado com o peso dela no 1º turno.</li>
       <li><b>Abstenção:</b> onde ela subiu ou caiu e a quem isso prejudica.</li>
       <li><b>3ª via:</b> para onde foram, região a região, os votos dos outros candidatos do 1º turno.</li></ul></section>`;
@@ -844,7 +888,7 @@ function brAnalise(est) {
   const min = est.min_apurado ?? 5, cedo = !(a.total.apurado_pct >= min);
   const cr = cedo ? "" : cartaoCrescimento(est.brasil.crescimento)
     || `<section class="painel"><header><h2>Por que cada um cresce</h2></header><div class="vazio">Aparece quando houver 30 municípios com 90% ou mais apurado: antes disso a conta mede mais a ordem de apuração do que o voto.</div></section>`;
-  el.innerHTML = (cr || "") + brOrigem(a) + `<details class="painel br-det" ${expandido["br-det"] ? "open" : ""}><summary><h2>Região por região: abstenção e 3ª via</h2><span>contabilidade nas mesmas urnas</span></summary>
+  el.innerHTML = (cr || "") + cartaoCenario(est.brasil?.cenario, true) + brOrigem(a) + `<details class="painel br-det" ${expandido["br-det"] ? "open" : ""}><summary><h2>Região por região: abstenção e 3ª via</h2><span>contabilidade nas mesmas urnas</span></summary>
     <div class="br-dupla">${brAbstencao(a, cedo, min)}${brTerceira(a, cedo, min)}</div></details>`;
   el.querySelector(".br-det").addEventListener("toggle", (ev) => { expandido["br-det"] = ev.target.open; });
 }
@@ -884,8 +928,10 @@ async function renderMapa(est) {
   const escopo = br ? "brasil" : "exterior";
   const ok = br ? brOk() : !!est.exterior?.modelos?.[MODELO]?.disponivel;
   let m = modo[escopo];
+  if (MODOS[m]?.so && MODOS[m].so !== escopo) m = "proj";
+  if (m === "cenario" && !est.brasil?.cenario) m = "t1";
   if (!ok && (m === "proj" || m === "desvio")) m = br && est.fase !== "apurando" ? "t1" : "contado";
-  $("modos").innerHTML = Object.entries(MODOS).map(([k, v]) =>
+  $("modos").innerHTML = Object.entries(MODOS).filter(([, v]) => !v.so || v.so === escopo).map(([k, v]) =>
     `<button data-modo="${k}" aria-pressed="${k === m}" ${!ok && (k === "proj" || k === "desvio") ? "disabled title='Aparece com a projeção'" : ""}>${v.rot}</button>`).join("");
   $("mapa-acoes").innerHTML = br
     ? (sel.brasil ? `<button class="chip-btn" data-sel="">← Brasil inteiro</button>` : "")
@@ -897,6 +943,7 @@ async function renderMapa(est) {
     desvio: "Lula agora × a base (1º turno + transferência), onde já há voto. É esse desvio que a projeção leva para o que falta.",
     andamento: br ? "Quanto de cada município já foi apurado." : "Quanto das seções de cada país já chegou.",
     t1: "Lula × Flávio no 1º turno de 2026, só entre os dois. É a referência da projeção.",
+    cenario: "Cada município votando com as variáveis que o exterior está dando para a sua faixa do 1º turno (3ª via e quem volta a votar). É um cenário, não a projeção.",
   };
   $("mapa-nota").textContent = notas[m];
   const modoEfetivo = modo[escopo]; modo[escopo] = m;

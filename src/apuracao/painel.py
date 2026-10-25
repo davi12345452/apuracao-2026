@@ -493,6 +493,99 @@ def resultado_final(ctx: Ctx, m: np.ndarray) -> dict:
     return out
 
 
+K_FAIXA = 20.0  # ridge das variáveis de uma faixa para as do exterior todo (em "seções equivalentes")
+
+
+def variaveis_exterior(ctx: Ctx) -> dict | None:
+    """Variáveis do exterior por faixa do 1º turno: fatia da 3ª via e de quem passou a votar que foi para
+    cada um (regressão por seção, puxada para a do exterior todo quando a faixa tem poucas seções)."""
+    bu1 = _bu_1t(ctx.db)
+    k = lambda r: (r["mun"], r["zona"], r["secao"])  # noqa: E731
+    pares = [(r, bu1[k(r)]) for r in ctx.bu_rows if k(r) in bu1 and bu1[k(r)]["aptos"] and r["aptos"]]
+    if len(pares) < 40:
+        return None
+    X = np.array([[r["lula"], r["flavio"], r["comparecimento"], s["lula"], s["flavio"], s["comparecimento"], s["aptos"],
+                   s["brancos"] + s["nulos"]] for r, s in pares], float)
+    L2, F2, C2, L1, F1, C1, A1, B1 = X.T
+    O1 = C1 - L1 - F1 - B1
+    Z = np.c_[O1 / A1, (C2 - C1) / A1] * np.sqrt(A1)[:, None]
+    Y = np.c_[(L2 - L1) / A1, (F2 - F1) / A1] * np.sqrt(A1)[:, None]
+    glob = np.linalg.lstsq(Z, Y, rcond=None)[0]  # 2×2: linhas 3ª via / novos, colunas Lula / Flávio
+    incl = 100 * L1 / np.maximum(L1 + F1, 1)
+    faixas = []
+    for lo, hi, nome, lado in GRUPOS_1T:
+        m = (incl >= lo) & (incl < hi)
+        G = Z[m].T @ Z[m] + K_FAIXA * 1e-3 * np.eye(2)
+        c = np.linalg.solve(G, Z[m].T @ Y[m] + K_FAIXA * 1e-3 * glob) if m.any() else glob
+        faixas.append({"nome": nome, "lado": lado, "de": lo, "ate": min(hi, 100), "secoes": int(m.sum()),
+                       "c": c, "terceira_lula": _r(100 * c[0, 0]), "terceira_flavio": _r(100 * c[0, 1]),
+                       "novos_lula": _r(100 * c[1, 0]), "novos_flavio": _r(100 * c[1, 1])})
+    return {"secoes": len(pares), "faixas": faixas}
+
+
+def cenario_brasil(ctx: Ctx, var: dict, u: Unidades | None = None) -> dict:
+    """O Brasil votando com as variáveis do exterior: cada município recebe as da sua faixa do 1º turno.
+    Variação do comparecimento: a do próprio município do 1º para o 2º turno de 2022. Depois das 17h,
+    cada região também traz o que ela mesma mede (municípios com 90% ou mais apurado)."""
+    b1, a1, a2 = ctx.B["2026_1t"], ctx.B["2022_1t"], ctx.B["2022_2t"]
+    m = ~ctx.ext & b1["tem"] & (b1["aptos"] > 0) & (b1["lula"] + b1["direita"] > 0)
+    L1, F1, O1, C1, A1 = b1["lula"], b1["direita"], b1["outros"], b1["comparecimento"], b1["aptos"]
+    ok22 = a1["tem"] & a2["tem"] & (a1["comparecimento"] > 0)
+    r_nac = a2["comparecimento"][m & ok22].sum() / a1["comparecimento"][m & ok22].sum()
+    r22 = np.where(ok22, a2["comparecimento"] / np.where(ok22, a1["comparecimento"], 1), r_nac)
+    dC = np.where(m, C1 * (r22 - 1), 0.0)
+    incl = 100 * L1 / np.maximum(L1 + F1, 1)
+    dL3, dLn, dF3, dFn = (np.zeros(len(L1)) for _ in range(4))
+    for f in var["faixas"]:
+        g = m & (incl >= f["de"]) & ((incl < f["ate"]) if f["ate"] < 100 else True)
+        c = f["c"]
+        dL3[g], dF3[g] = c[0, 0] * O1[g], c[0, 1] * O1[g]
+        dLn[g], dFn[g] = c[1, 0] * dC[g], c[1, 1] * dC[g]
+    L2, F2 = np.maximum(L1 + dL3 + dLn, 0), np.maximum(F1 + dF3 + dFn, 0)
+    medido = None
+    if u is not None:
+        b = (u.vv > 0) & m & (u.est >= MIN_FRAC_MUN * u.te)
+        medido = b
+
+    def agrega(sel):
+        s1, s2 = (L1[sel] + F1[sel]).sum(), (L2[sel] + F2[sel]).sum()
+        r = {"lula_1t_pct": _pct(L1[sel].sum(), s1), "lula_pct": _pct(L2[sel].sum(), s2),
+             "lula_3via": int(round(dL3[sel].sum())), "lula_novos": int(round(dLn[sel].sum())),
+             "flavio_3via": int(round(dF3[sel].sum())), "flavio_novos": int(round(dFn[sel].sum())),
+             "outros_1t": int(round(O1[sel].sum())), "d_comparecimento": int(round(dC[sel].sum())),
+             "abst_1t": _pct(A1[sel].sum() - C1[sel].sum(), A1[sel].sum()),
+             "abst": _pct(A1[sel].sum() - C1[sel].sum() - dC[sel].sum(), A1[sel].sum()),
+             "saldo_lula": int(round((L2[sel] - F2[sel]).sum())), "saldo_lula_1t": int(round((L1[sel] - F1[sel]).sum()))}
+        if medido is not None:
+            mm = sel & medido
+            if mm.sum() >= 30:
+                g = u.est[mm] / A1[mm]
+                try:
+                    d = _decompor(u.lula[mm], u.vv[mm] - u.lula[mm], u.c[mm], u.est[mm], np.maximum(u.c[mm] - u.vv[mm], 0),
+                                  g * L1[mm], g * F1[mm], g * C1[mm], g * A1[mm],
+                                  g * np.maximum(C1[mm] - b1["validos"][mm], 0), np.array(["x"] * int(mm.sum())), {}, n_boot=60)
+                    r["medido"] = {"municipios": int(mm.sum()), "lula_pct": _pct(u.lula[mm].sum(), u.vv[mm].sum()),
+                                   "lula_1t_pct": _pct((g * L1[mm]).sum(), (g * (L1[mm] + F1[mm])).sum()),
+                                   "terceira_lula": d["candidatos"]["lula"]["fatia_3via"], "novos_lula": d["candidatos"]["lula"]["fatia_novos"],
+                                   "abst_1t": d["abst_1t"], "abst": d["abst"]}
+                except Exception:  # noqa: BLE001 - sem medição nesta região
+                    pass
+        return r
+
+    regioes = []
+    for nome in ORDEM_REGIOES:
+        if nome == "Exterior":
+            continue
+        sel = m & (ctx.regiao == REGIOES.index(nome)) if nome in REGIOES else np.zeros(len(m), bool)
+        ufs = sorted({str(ctx.uf[i]) for i in np.where(sel)[0]})
+        regioes.append({"regiao": nome, **agrega(sel),
+                        "ufs": [{"uf": uf.upper(), "nome": NOMES_UF.get(uf, uf), **agrega(sel & (ctx.uf == uf))} for uf in ufs]})
+    mun = {ctx.ibge[i]: _r(100 * L2[i] / (L2[i] + F2[i])) for i in np.where(m)[0] if ctx.ibge[i] and L2[i] + F2[i] > 0}
+    return {"secoes_exterior": var["secoes"],
+            "faixas": [{k: v for k, v in f.items() if k != "c"} for f in var["faixas"]],
+            "brasil": agrega(m), "regioes": regioes, "mun": mun}
+
+
 def recentes_exterior(ctx: Ctx, n: int = 100, n_lotes: int = 12, janela_min: int = 10) -> tuple[list[dict], list[dict]]:
     """Os boletins mais recentes do exterior (mais novo primeiro) e as chegadas em janelas de 10 min,
     cada um comparado com o 1º turno (mesma seção quando há, senão média da cidade) e com 2022 (cidade)."""
@@ -847,6 +940,12 @@ def estado(db: DB) -> dict:
                     brasil["crescimento"] = crescimento_brasil(ctx, u)
                 except Exception as e:  # noqa: BLE001
                     db.log("aviso", f"crescimento_brasil: {e!r}")
+            try:
+                var = variaveis_exterior(ctx)
+                if var:
+                    brasil["cenario"] = cenario_brasil(ctx, var, u if apurando else None)
+            except Exception as e:  # noqa: BLE001 - o painel segue sem o cenário
+                db.log("aviso", f"cenario_brasil: {e!r}")
     brasil["hist"] = db.query("SELECT * FROM proj_hist WHERE escopo='br' ORDER BY ts")
     serie = db.query("SELECT ts_coleta, hg, secoes_apur, secoes_tot, lula, validos FROM snap "
                      "WHERE abr='br' AND secoes_apur>0 ORDER BY ts_coleta")
