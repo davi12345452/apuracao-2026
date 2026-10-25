@@ -458,6 +458,16 @@ function chipComp(rot, d, titulo) {
     : `${marca(d > 0 ? "l" : "f")}<span>${d > 0 ? "Lula" : "Flávio"} +${Math.abs(d).toFixed(1).replace(".", ",")}</span>`;
   return `<span class="fx-chip" title="${esc(titulo)}"><small>${rot}</small><span class="v">${corpo}</span></span>`;
 }
+// votos de cada um contra a referência: os dois podem crescer (a 3ª via do 1º turno se redistribui)
+const sinalN = (d) => (d > 0 ? "+" : d < 0 ? "−" : "±") + fmtN(Math.abs(d));
+function chipVotos(rot, v, r, aprox, titulo) {
+  if (!v) return `<span class="fx-chip fx-votos" title="${esc(titulo)}"><small>${rot}</small><span class="v"><span class="muted">sem base</span></span></span>`;
+  const ap = aprox ? "≈" : "";
+  const lin = (k, nome, atual, antes) => `<span class="fx-vl">${marca(k)}<span class="n">${nome}</span><b class="${atual > antes ? "sobe" : atual < antes ? "desce" : ""}">${sinalN(atual - antes)}</b><small>de ${ap}${fmtN(antes)}</small></span>`;
+  return `<span class="fx-chip fx-votos" title="${esc(titulo)}"><small>${rot}</small>
+    ${lin("l", "Lula", r.lula, v.lula)}${lin("f", "Flávio", r.flavio, v.flavio)}
+    ${v.outros ? `<span class="fx-3v">3ª via tinha ${ap}${fmtN(v.outros)}</span>` : ""}</span>`;
+}
 const fmtPPs = (d) => (d == null ? "—" : (d > 0 ? "+" : d < 0 ? "−" : "") + Math.abs(d).toFixed(1).replace(".", ","));
 const listaPaises = (ps, n = 3) => {
   const nomes = ps.slice(0, n).map((p) => p[0]);
@@ -478,6 +488,7 @@ function renderFeedExterior(est) {
   const ref1 = L && L.secao_1t === L.boletins ? "nessas seções" : L && L.secao_1t ? "nessas seções e cidades" : "nessas cidades";
   const resumo = L ? `<div class="fx-resumo"><b>${quando}:</b> ${L.boletins} ${L.boletins === 1 ? "boletim" : "boletins"} de ${esc(listaPaises(L.paises))}
     <span class="sep">·</span> <b>Lula × Flávio: Lula ${fmtP(L.lula_pct)}</b> <span class="muted">(no 1º turno ${ref1}: ${fmtP(L.lula_1t_pct)})</span>
+    ${L.vs_1t && L.secao_1t ? `<span class="sep">·</span> <b>desde o 1º turno${L.secao_1t < L.boletins ? ` (${L.secao_1t} seções)` : ""}: Lula ${sinalN(L.vs_1t.lula - L.vs_1t.lula_antes)}, Flávio ${sinalN(L.vs_1t.flavio - L.vs_1t.flavio_antes)}</b> <span class="muted">(3ª via tinha ${fmtN(L.vs_1t.outros_antes)})</span>` : ""}
     <span class="sep">·</span> abstenção <b>${fmtP(L.abstencao_pct, 0)}</b> <span class="muted">(1º turno: ${fmtP(L.abstencao_1t_pct, 0)})</span>
     ${nNovos ? `<span class="fx-novos">${nNovos} ${nNovos === 1 ? "novo" : "novos"} desde a última atualização</span>` : ""}</div>` : "";
   renderPlacarExterior(x.placar);
@@ -496,21 +507,22 @@ function renderFeedExterior(est) {
         <small>${fmtN(r.lula)} × ${fmtN(r.flavio)} · ${fmtN(r.brancos)} br. · ${fmtN(r.nulos)} nulos</small>`}</span>
       <span class="fx-abst"><small>abstenção</small><b>${fmtP(r.abstencao_pct, 0)}</b><small>1º t. ${fmtP(r.abstencao_1t_pct, 0)}${cid1 ? "*" : ""}</small></span>
       <span class="fx-chips">
-        ${chipComp(`1º turno${cid1 ? " · média da cidade" : ""}`, r.d_lula_1t, `Lula entre Lula e Flávio: ${fmtP(pl)} agora × ${fmtP(r.lula_1t_pct)} no 1º turno (${cid1 ? "média da cidade: seção sem boletim no 1º turno" : "mesma seção"}). Abstenção: ${fmtP(r.abstencao_pct)} × ${fmtP(r.abstencao_1t_pct)}.`)}
-        ${chipComp(`2022${cid22 ? " · média da cidade" : ""}`, r.d_lula_2022, `Lula × Bolsonaro no 2º turno de 2022 (${cid22 ? "média da cidade: seção não existia em 2022" : "mesma seção"}): ${fmtP(r.lula_2022_pct)}. Abstenção em 2022: ${fmtP(r.abstencao_2022_pct)}.`)}
+        ${chipVotos(`votos × 1º turno${cid1 ? " · média da cidade" : ""}`, r.v_1t, r, cid1, `Votos nesta seção agora × no 1º turno (${cid1 ? "seção sem boletim no 1º turno: média da cidade na escala desta seção" : "mesma seção"}). Lula entre os dois: ${fmtP(pl)} agora × ${fmtP(r.lula_1t_pct)}. Abstenção: ${fmtP(r.abstencao_pct)} × ${fmtP(r.abstencao_1t_pct)}.`)}
+        ${chipVotos(`votos × 2022${cid22 ? " · média da cidade" : ""}`, r.v_2022, r, cid22, `Lula × Bolsonaro no 2º turno de 2022 (${cid22 ? "seção não existia em 2022: média da cidade na escala desta seção" : "mesma seção"}): Lula ${fmtP(r.lula_2022_pct)} dos dois. Abstenção em 2022: ${fmtP(r.abstencao_2022_pct)}.`)}
       </span></div>`;
   }).join("");
   const maisBU = rec.length > N_BU ? `<button class="mais" data-exp="fx-bu">${expandido["fx-bu"] ? "Ver só os 10 mais recentes" : `Ver mais (${rec.length} mais recentes)`}</button>` : "";
   // ---------- lotes ----------
   const lotesVis = expandido["fx-lotes"] ? lotes : lotes.slice(0, N_LOTES);
   const maisLotes = lotes.length > N_LOTES ? `<button class="mais" data-exp="fx-lotes">${expandido["fx-lotes"] ? "Ver menos" : `Ver mais (${lotes.length})`}</button>` : "";
-  const tabLotes = `<table class="tabela fx-lotes"><thead><tr><th>Chegada</th><th>Bol.</th><th>Lula</th><th>× 1º turno</th><th>Abst.</th></tr></thead><tbody>` +
+  const tabLotes = `<table class="tabela fx-lotes"><thead><tr><th>Chegada</th><th>Bol.</th><th>Lula</th><th>Flávio</th><th>3ª via</th></tr></thead><tbody>` +
     lotesVis.map((l) => `<tr><td><b>${hora(l.de)}</b><small>${esc(listaPaises(l.paises, 2))}</small></td><td>${l.boletins}</td>
-      <td>${fmtP(l.lula_pct, 1)}</td><td>${fmtDelta(l.lula_pct != null && l.lula_1t_pct != null ? l.lula_pct - l.lula_1t_pct : null, 1, true)}</td>
-      <td>${fmtP(l.abstencao_pct, 0)}<small>1º t. ${fmtP(l.abstencao_1t_pct, 0)}</small></td></tr>`).join("") + `</tbody></table>`;
+      ${l.secao_1t ? `<td class="${l.vs_1t.lula > l.vs_1t.lula_antes ? "sobe" : "desce"}"><b>${sinalN(l.vs_1t.lula - l.vs_1t.lula_antes)}</b><small>${fmtN(l.vs_1t.lula)} votos</small></td>
+      <td class="${l.vs_1t.flavio > l.vs_1t.flavio_antes ? "sobe" : "desce"}"><b>${sinalN(l.vs_1t.flavio - l.vs_1t.flavio_antes)}</b><small>${fmtN(l.vs_1t.flavio)} votos</small></td>
+      <td><b>${fmtN(l.vs_1t.outros_antes)}</b><small>no 1º t.</small></td>` : `<td colspan="3" class="muted">seções novas, sem 1º turno</td>`}</tr>`).join("") + `</tbody></table>`;
   $("feed").innerHTML = `${resumo}<div class="fx-grade"><div><div class="fx-lista">${linhas}</div>${maisBU}</div>
-    <div class="fx-lado"><div class="sub-h">Chegadas a cada 10 min</div><div class="fx-tab">${tabLotes}</div>${maisLotes}
-    <p class="nota-leitura">Lula entre Lula e Flávio. Comparação com a mesma seção no 1º turno e em 2022; "média da cidade" (e *) só quando a seção não existia na outra eleição.</p></div></div>`;
+    <div class="fx-lado"><div class="sub-h">Chegadas a cada 10 min · votos ganhos desde o 1º turno</div><div class="fx-tab">${tabLotes}</div>${maisLotes}
+    <p class="nota-leitura">Votos ganhos ou perdidos por cada um na mesma seção. Os dois podem crescer ao mesmo tempo: no 2º turno os votos da 3ª via (e quem não tinha ido votar) se dividem entre eles. "Média da cidade" (e ≈) só quando a seção não existia na outra eleição.</p></div></div>`;
 }
 
 // placar do exterior em números brutos, no topo da aba (inserido antes do mapa; só aparece na aba Exterior)

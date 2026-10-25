@@ -302,12 +302,16 @@ def _refs_bu(ctx: Ctx, r: dict, bu1: dict, s22: dict | None = None) -> dict:
     existe na outra eleição (chave município+zona+seção) e, só senão, na média da cidade."""
     i = ctx.idx.get(("zz", r["mun"]))
     out: dict = {"cidade": "", "pais": "", "lula_1t": None, "abst_1t": None, "ref_1t": None,
-                 "lula_2022": None, "abst_2022": None, "ref_2022": None}
+                 "lula_2022": None, "abst_2022": None, "ref_2022": None,
+                 # votos de cada um na referência (seção, ou média da cidade na escala dos aptos desta seção)
+                 "v_1t": None, "v_2022": None}
+    esc = lambda b, i: r["aptos"] / b["aptos"][i]  # noqa: E731
     s = (s22 or {}).get((r["mun"], r["zona"], r["secao"]))
     if s and (s["lula"] + s["bolsonaro"]) > 0 and s["aptos"]:
         out["lula_2022"] = 100 * s["lula"] / (s["lula"] + s["bolsonaro"])
         out["abst_2022"] = 100 * (s["aptos"] - s["comparecimento"]) / s["aptos"]
         out["ref_2022"] = "secao"
+        out["v_2022"] = {"lula": s["lula"], "flavio": s["bolsonaro"], "outros": 0}
     if i is not None:
         out["cidade"], out["pais"] = ctx.nome[i].title(), str(ctx.pais[i]) or "?"
     s = bu1.get((r["mun"], r["zona"], r["secao"]))
@@ -315,18 +319,25 @@ def _refs_bu(ctx: Ctx, r: dict, bu1: dict, s22: dict | None = None) -> dict:
         out["lula_1t"] = 100 * s["lula"] / (s["lula"] + s["flavio"])
         out["abst_1t"] = 100 * (s["aptos"] - s["comparecimento"]) / s["aptos"]
         out["ref_1t"] = "secao"
+        out["v_1t"] = {"lula": s["lula"], "flavio": s["flavio"],
+                       "outros": s["comparecimento"] - s["lula"] - s["flavio"] - s["brancos"] - s["nulos"]}
     elif i is not None:
         b = ctx.B["2026_1t"]
         if b["tem"][i] and b["lula"][i] + b["direita"][i] > 0 and b["aptos"][i] > 0:
             out["lula_1t"] = 100 * b["lula"][i] / (b["lula"][i] + b["direita"][i])
             out["abst_1t"] = 100 * (b["aptos"][i] - b["comparecimento"][i]) / b["aptos"][i]
             out["ref_1t"] = "cidade"
+            k = esc(b, i)
+            out["v_1t"] = {"lula": round(k * b["lula"][i]), "flavio": round(k * b["direita"][i]),
+                           "outros": round(k * b["outros"][i])}
     if i is not None and out["ref_2022"] is None:
         b = ctx.B["2022_2t"]
         if b["tem"][i] and b["lula"][i] + b["direita"][i] > 0 and b["aptos"][i] > 0:
             out["lula_2022"] = 100 * b["lula"][i] / (b["lula"][i] + b["direita"][i])
             out["abst_2022"] = 100 * (b["aptos"][i] - b["comparecimento"][i]) / b["aptos"][i]
             out["ref_2022"] = "cidade"
+            k = esc(b, i)
+            out["v_2022"] = {"lula": round(k * b["lula"][i]), "flavio": round(k * b["direita"][i]), "outros": 0}
     return out
 
 
@@ -398,6 +409,7 @@ def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int 
             "d_lula_1t": dif(lula, ref["lula_1t"]), "d_abst_1t": dif(abst, ref["abst_1t"]),
             "lula_2022_pct": ref["lula_2022"], "abstencao_2022_pct": ref["abst_2022"], "ref_2022": ref["ref_2022"],
             "d_lula_2022": dif(lula, ref["lula_2022"]), "d_abst_2022": dif(abst, ref["abst_2022"]),
+            "v_1t": ref["v_1t"], "v_2022": ref["v_2022"],
         })
     # lotes: janelas de 10 min pela hora de recebimento no TSE
     grupos: dict[str, list[dict]] = {}
@@ -417,6 +429,7 @@ def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int 
         cont: dict[str, int] = defaultdict(int)
         for x in g:
             cont[x["pais"]] += 1
+        g1 = [x for x in g if x["ref_1t"] == "secao"]
         h0 = int(ini[11:13]) * 60 + int(ini[14:16]) + janela_min
         lotes.append({
             "de": ini, "ate": f"{ini[:11]}{h0 // 60 % 24:02d}:{h0 % 60:02d}", "boletins": len(g),
@@ -424,6 +437,10 @@ def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int 
             "lula": L, "flavio": F, "lula_pct": _pct(L, L + F), "abstencao_pct": _pct(A - C, A),
             "lula_1t_pct": _r(med(w1), 3), "abstencao_1t_pct": _r(med(a1), 3), "lula_2022_pct": _r(med(w22), 3),
             "secao_1t": sum(1 for x in g if x["ref_1t"] == "secao"),
+            # votos brutos contra o 1º turno, só nas seções que existem nos dois turnos
+            "vs_1t": {"lula": sum(x["lula"] for x in g1), "lula_antes": sum(x["v_1t"]["lula"] for x in g1),
+                      "flavio": sum(x["flavio"] for x in g1), "flavio_antes": sum(x["v_1t"]["flavio"] for x in g1),
+                      "outros_antes": sum(x["v_1t"]["outros"] for x in g1)},
         })
     rec = []
     for x in reversed(linhas[-n:]):
