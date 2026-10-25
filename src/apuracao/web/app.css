@@ -522,3 +522,6 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
   .cascata { grid-template-columns: 96px 1fr 64px; }
   .prob-linha { grid-template-columns: 1fr 56px; } .prob-linha .trilho { grid-column: 1 / -1; grid-row: 2; }
 }
+
+.alt.ref { display: grid; gap: 3px; }
+.alt.ref .ref-l { font-size: 12.5px; }

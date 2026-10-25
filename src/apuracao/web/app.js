@@ -263,6 +263,17 @@ function barraProj(p) {
   return `<div class="barra-proj"><div class="bl" style="width:${p.lula_pct}%"></div><div class="bf"></div>
     <div class="faixa" style="left:${p.p10}%;width:${Math.max(0.6, p.p90 - p.p10)}%" title="Faixa de 80%"></div><div class="meio"></div></div>`;
 }
+// o resultado de verdade das eleições anteriores no mesmo escopo, para não confundir com o modelo alternativo
+function refFinal(p, alt, x) {
+  const r = x.ref_final || {}, r22 = r["2022_2t"], r1 = r["2026_1t"];
+  const linha = (rot, v, extra) => v && v.lula_pct != null ? `<span>${rot}: <b>Lula ${fmtP(v.lula_pct)}</b>${extra || ""}</span>` : "";
+  const dif = r22 && r22.lula_pct != null ? p.lula_pct - r22.lula_pct : null;
+  return `<div class="alt ref">
+    <div class="ref-l">${linha("2º turno 2022 (resultado)", r22, dif == null ? "" : ` <span class="muted">· projeção ${dif >= 0 ? "acima" : "abaixo"} em ${fmtPPs(Math.abs(dif)).replace("+", "")} pp</span>`)}</div>
+    <div class="ref-l">${linha("1º turno 2026 (resultado, entre os dois)", r1)}</div>
+    ${alt && alt.lula_pct != null ? `<div class="ref-l muted">Outro modelo, partindo de 2022 em vez do 1º turno: Lula ${fmtP(alt.lula_pct)} (${fmtP(alt.p10)}–${fmtP(alt.p90)})</div>` : ""}
+  </div>`;
+}
 function veredito(p, alt, escopo, est) {
   const br = escopo === "brasil";
   const ok = br ? brOk() : !!(p && p.lula_pct != null && p.disponivel);
@@ -282,7 +293,7 @@ function veredito(p, alt, escopo, est) {
       <div class="lado dir"><span class="nome">Flávio · 22</span><span class="pct f">${fmtP(100 - p.lula_pct)}</span></div></div>
     ${barraProj(p)}
     <div class="det"><span>faixa <b>${fmtP(p.p10)}–${fmtP(p.p90)}</b></span><span>chance de Lula <b>${fmtP(p.prob_lula, 0)}</b></span><span>${lado} por <b>${fmtMi(Math.abs(p.margem_votos))}</b></span></div>
-    ${alt && alt.lula_pct != null ? `<div class="alt">Usando o ${NOME_MODELO[MODELO_ALT]} como base: <b>Lula ${fmtP(alt.lula_pct)}</b> (${fmtP(alt.p10)}–${fmtP(alt.p90)}).</div>` : ""}`;
+    ${refFinal(p, alt, (br ? est.brasil : est.exterior) || {})}`;
 }
 
 function blocoContado(titulo, info, lula, validos, porque) {

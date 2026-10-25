@@ -456,6 +456,17 @@ def crescimento_exterior(ctx: Ctx, n_boot: int = 300) -> dict | None:
             "candidatos": cand, "grupos": grupos, "paises": paises}
 
 
+def resultado_final(ctx: Ctx, m: np.ndarray) -> dict:
+    """Resultado completo (não só as seções já apuradas) do 2º turno 2022 e do 1º turno 2026 no escopo:
+    Lula entre os dois primeiros e abstenção."""
+    out = {}
+    for b in ("2022_2t", "2026_1t"):
+        B = ctx.B[b]
+        L, D, C, A = B["lula"][m].sum(), B["direita"][m].sum(), B["comparecimento"][m].sum(), B["aptos"][m].sum()
+        out[b] = {"lula_pct": _pct(L, L + D), "abstencao_pct": _pct(A - C, A)}
+    return out
+
+
 def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int = 10) -> tuple[list[dict], list[dict]]:
     """Os boletins mais recentes do exterior (mais novo primeiro) e as chegadas em janelas de 10 min,
     cada um comparado com o 1º turno (mesma seção quando há, senão média da cidade) e com 2022 (cidade)."""
@@ -811,6 +822,7 @@ def estado(db: DB) -> dict:
                      "WHERE abr='br' AND secoes_apur>0 ORDER BY ts_coleta")
     brasil["serie"] = [{"t": r["ts_coleta"], "hg": r["hg"], "apurado": _pct(r["secoes_apur"], r["secoes_tot"]),
                         "lula_pct": _pct(r["lula"], r["validos"])} for r in serie]
+    brasil["ref_final"] = resultado_final(ctx, ~ctx.ext)
     out["brasil"] = brasil
 
     # ---------------- Movimentos dos mercados × exterior ----------------
@@ -850,6 +862,7 @@ def estado(db: DB) -> dict:
     except Exception as e:  # noqa: BLE001 - o painel segue sem o feed
         db.log("aviso", f"recentes do exterior: {e!r}")
         ext["recentes"], ext["lotes"] = [], []
+    ext["ref_final"] = resultado_final(ctx, ctx.ext)
     out["exterior"] = ext
     return out
 
