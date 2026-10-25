@@ -551,7 +551,44 @@ function renderPlacarExterior(pl) {
       <div class="xp-big">+${fmtN(uh.secoes)}<small> seções</small></div>
       <div class="xp-l">${marca("l")}<span class="n">Lula</span><b>+${fmtN(uh.lula)}</b></div>
       <div class="xp-l">${marca("f")}<span class="n">Flávio</span><b>+${fmtN(uh.flavio)}</b></div>
-      <div class="xp-sub">pela hora em que o TSE recebeu</div></div>`;
+      <div class="xp-sub">pela hora em que o TSE recebeu</div></div>
+    ${cartaoFluxo(pl.vs_1t)}`;
+}
+
+// de onde vieram os votos que Lula e Flávio ganharam desde o 1º turno, nas mesmas seções.
+// Balanço exato: ΔLula + ΔFlávio = 3ª via do 1º turno + Δcomparecimento − Δ(brancos+nulos)
+function cartaoFluxo(v) {
+  if (!v || !v.secoes || v.outros_antes == null) return "";
+  const dL = v.lula - v.lula_antes, dF = v.flavio - v.flavio_antes, tot = dL + dF;
+  const dC = v.comparecimento - v.comparecimento_antes, dBN = v.brancos_nulos - v.brancos_nulos_antes;
+  const fontes = [
+    { rot: "votos da 3ª via no 1º turno", v: v.outros_antes, cor: "var(--a4)" },
+    { rot: dC >= 0 ? "gente que não tinha votado" : "gente que votou no 1º turno e não voltou", v: dC, cor: "var(--a3)" },
+    { rot: dBN <= 0 ? "brancos e nulos que escolheram um lado" : "a mais em branco e nulo", v: -dBN, cor: "var(--a2)" },
+  ];
+  const destinos = [{ rot: "Lula", v: dL, cor: "var(--lula)" }, { rot: "Flávio", v: dF, cor: "var(--flavio)" }];
+  const escala = Math.max(1, ...[fontes, destinos].map((xs) => xs.filter((x) => x.v > 0).reduce((a, x) => a + x.v, 0)));
+  const barra = (xs) => `<div class="fx-barra">${xs.filter((x) => x.v > 0).map((x) =>
+    `<i style="width:${(100 * x.v) / escala}%;background:${x.cor}" title="${esc(x.rot)}: ${fmtN(x.v)}"></i>`).join("")}</div>`;
+  const legenda = (xs) => `<div class="fx-leg">${xs.filter((x) => x.v !== 0).map((x) =>
+    `<span><i style="background:${x.cor}"></i>${esc(x.rot)} <b>${x.v > 0 ? "+" : "−"}${fmtN(Math.abs(x.v))}</b></span>`).join("")}</div>`;
+  const fatiaAntes = (100 * v.lula_antes) / Math.max(1, v.lula_antes + v.flavio_antes);
+  const fatiaAgora = (100 * v.lula) / Math.max(1, v.lula + v.flavio);
+  const fatiaNovos = tot > 0 ? (100 * dL) / tot : null;
+  const quem = fatiaAgora >= fatiaAntes ? "Lula" : "Flávio";
+  const frase = fatiaNovos == null ? "" : `Lula ficou com <b>${fmtP(fatiaNovos)}</b> dos votos novos e Flávio com <b>${fmtP(100 - fatiaNovos)}</b>.
+    No 1º turno, Lula tinha ${fmtP(fatiaAntes)} dos votos dos dois; como pegou ${fatiaNovos >= fatiaAntes ? "mais" : "menos"} que isso do que entrou,
+    a fatia dele ${fatiaAgora >= fatiaAntes ? "subiu" : "caiu"} para <b>${fmtP(fatiaAgora)}</b>: em proporção, quem ganhou terreno foi <b>${quem}</b>.`;
+  return `<div class="xp-card fx">
+    <div class="rot">Os dois cresceram desde o 1º turno · de onde vieram os votos novos</div>
+    <div class="xp-sub">nas ${fmtN(v.secoes)} seções já apuradas que existem nos dois turnos</div>
+    <div class="fx-grade">
+      <div class="fx-t">De onde vieram</div><div>${barra(fontes)}${legenda(fontes)}</div>
+      <div class="fx-t">Para quem foram</div><div>${barra(destinos)}${legenda(destinos)}</div>
+    </div>
+    <p class="fx-frase">Lula e Flávio somaram <b>+${fmtN(tot)}</b> votos. ${frase}</p>
+    <p class="xp-sub">É um balanço do total, não o caminho de cada eleitor: não dá para saber quem da 3ª via foi para quem.</p>
+  </div>`;
 }
 
 // ================================================================ Brasil: feed e análises (agente B)

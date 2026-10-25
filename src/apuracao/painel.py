@@ -358,7 +358,13 @@ def placar_exterior(ctx: Ctx, agora: datetime | None = None) -> dict:
                     "lula": sm(m1, 0, "lula"), "lula_antes": sm(m1, 1, "lula"),
                     "flavio": sm(m1, 0, "flavio"), "flavio_antes": sm(m1, 1, "flavio"),
                     "comparecimento": sm(m1, 0, "comparecimento"), "comparecimento_antes": sm(m1, 1, "comparecimento"),
-                    "aptos": sm(m1, 0, "aptos"), "aptos_antes": sm(m1, 1, "aptos")}
+                    "aptos": sm(m1, 0, "aptos"), "aptos_antes": sm(m1, 1, "aptos"),
+                    # de onde vieram os votos novos: 3ª via do 1º turno, brancos/nulos e comparecimento
+                    "brancos_nulos": sm(m1, 0, "brancos") + sm(m1, 0, "nulos"),
+                    "brancos_nulos_antes": sm(m1, 1, "brancos") + sm(m1, 1, "nulos")}
+    v1 = out["vs_1t"]
+    v1["outros_antes"] = (v1["comparecimento_antes"] - v1["lula_antes"] - v1["flavio_antes"]
+                          - v1["brancos_nulos_antes"])
     out["vs_2022"] = {"secoes": len(m22),
                       "lula": sm(m22, 0, "lula"), "lula_antes": sm(m22, 1, "lula"),
                       "flavio": sm(m22, 0, "flavio"), "flavio_antes": sm(m22, 1, "bolsonaro"),
