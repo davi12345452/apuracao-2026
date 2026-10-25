@@ -58,9 +58,13 @@ class Vigia:
 
     # ---------- processos ----------
     def subir(self, nome: str) -> None:
-        log = open(Path(os.environ.get("APURACAO_DATA", RAIZ / "data")) / f"{nome}.log", "a")
+        arq = Path(os.environ.get("APURACAO_DATA", RAIZ / "data")) / f"{nome}.log"
+        if arq.exists() and arq.stat().st_size > 5_000_000:  # log não cresce até encher o volume do banco
+            arq.replace(arq.with_suffix(".log.1"))
+        log = open(arq, "a")
         self.subiu_em[nome] = time.monotonic()
         self.filhos[nome] = subprocess.Popen(["nice", "-n", "10", *PROCS[nome]], cwd=RAIZ, stdout=log, stderr=log)
+        log.close()  # o filho tem a própria cópia; sem isso cada reinício vazava um arquivo aberto
 
     def supervisionar(self) -> None:
         for nome in PROCS:

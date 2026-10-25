@@ -7,6 +7,8 @@ requisições resolvem o nome por DNS-over-HTTPS (Cloudflare) via curl --doh-url
 from __future__ import annotations
 
 import json
+import math
+import re
 import subprocess
 import time
 from datetime import datetime
@@ -34,14 +36,23 @@ KALSHI_SERIES = {
 
 
 def _get(url: str, timeout: int = 20):
-    out = subprocess.run(["curl", "-s", "-m", str(timeout), "--doh-url", DOH, "-H", "Accept: application/json", url],
+    # --max-filesize: resposta gigante de uma API com problema não estoura a memória do container
+    out = subprocess.run(["curl", "-s", "--globoff", "--proto", "=https", "--max-filesize", "20000000", "-m", str(timeout), "--doh-url", DOH,
+                          "-H", "Accept: application/json", url],
                          capture_output=True, timeout=timeout + 5, check=True)
     return json.loads(out.stdout)
 
 
+def _p(x) -> float | None:
+    """Preço/probabilidade: só número finito entre 0 e 1 (valor absurdo de uma API não chega ao painel)."""
+    v = _f(x)
+    return v if v is not None and math.isfinite(v) and 0 <= v <= 1 else None
+
+
 def _f(x) -> float | None:
     try:
-        return float(x)
+        v = float(x)
+        return v if math.isfinite(v) else None  # "NaN"/"Infinity" de uma API viraria JSON inválido no navegador
     except (TypeError, ValueError):
         return None
 
@@ -65,8 +76,8 @@ def _poly_mercados(slug: str) -> list[dict]:
         if m.get("closed"):
             continue
         precos = json.loads(m.get("outcomePrices") or "[]")
-        sim = _f(precos[0]) if precos else None
-        bid, ask = _f(m.get("bestBid")), _f(m.get("bestAsk"))
+        sim = _p(precos[0]) if precos else None
+        bid, ask = _p(m.get("bestBid")), _p(m.get("bestAsk"))
         meio = (bid + ask) / 2 if bid is not None and ask is not None and ask - bid < 0.1 else sim
         out.append({"pergunta": m.get("question", ""), "rotulo": m.get("groupItemTitle") or "", "prob": meio,
                     "volume": _f(m.get("volume"))})
@@ -107,8 +118,8 @@ def _kalshi(serie: str) -> list[dict]:
     d = _get(KALSHI + serie)
     out = []
     for m in d.get("markets") or []:
-        bid, ask = _f(m.get("yes_bid_dollars")), _f(m.get("yes_ask_dollars"))
-        last = _f(m.get("last_price_dollars"))
+        bid, ask = _p(m.get("yes_bid_dollars")), _p(m.get("yes_ask_dollars"))
+        last = _p(m.get("last_price_dollars"))
         meio = (bid + ask) / 2 if bid is not None and ask is not None and 0 <= ask - bid <= 0.1 else last
         out.append({"ticker": m.get("ticker"), "rotulo": m.get("yes_sub_title") or m.get("subtitle") or "",
                     "prob": meio, "volume": _f(m.get("volume_fp"))})
@@ -198,21 +209,25 @@ def _poly_hist(slug: str, de: int) -> list[tuple[int, float]]:
     tok = _poly_token_lula(slug)
     if not tok:
         return []
+    if not re.fullmatch(r"\d{1,100}", str(tok)):  # id vindo da API vai para a URL: só dígitos
+        return []
     h = _get(POLY_HIST.format(token=tok, de=de)).get("history") or []
-    return [(int(p["t"]), float(p["p"])) for p in h if p.get("p") is not None]
+    return [(int(p["t"]), _p(p["p"])) for p in h if _p(p.get("p")) is not None]
 
 
 def _kalshi_velas(serie: str, ticker: str, de: int, ate: int) -> list[tuple[int, float]]:
     """Velas de 1 min → ponto médio entre compra e venda no fechamento de cada minuto."""
+    if not re.fullmatch(r"[A-Z0-9._-]{1,80}", ticker or ""):  # ticker vindo da API vai para a URL
+        return []
     d = _get(KALSHI_VELAS.format(serie=serie, ticker=ticker, de=de, ate=ate), timeout=30)
     out = []
     for c in d.get("candlesticks") or []:
-        bid = _f((c.get("yes_bid") or {}).get("close_dollars"))
-        ask = _f((c.get("yes_ask") or {}).get("close_dollars"))
+        bid = _p((c.get("yes_bid") or {}).get("close_dollars"))
+        ask = _p((c.get("yes_ask") or {}).get("close_dollars"))
         if bid is not None and ask is not None and 0 <= ask - bid <= 0.1:
             out.append((int(c["end_period_ts"]), (bid + ask) / 2))
-        elif _f((c.get("price") or {}).get("close_dollars")) is not None:
-            out.append((int(c["end_period_ts"]), _f(c["price"]["close_dollars"])))
+        elif _p((c.get("price") or {}).get("close_dollars")) is not None:
+            out.append((int(c["end_period_ts"]), _p(c["price"]["close_dollars"])))
     return out
 
 

@@ -50,7 +50,7 @@ Critérios: erro ≤ 1,5 pp com 30% apurado e ≤ 0,7 pp com 60%; no ensaio, tot
 A imagem roda vigia, coletor e painel num container só (`Dockerfile`, `docker/entrypoint.sh`).
 
 - `vendor/` tem a cópia mínima do `analise_urnas` (cliente HTTP, zip remoto, parser de BU e specs ASN.1).
-- `seed/apuracao.db.gz` é a semente do banco: bases do 1º turno e de 2022 mais o que já tinha sido coletado. Na primeira subida, com o volume vazio, o container começa dela. Para atualizar: `sqlite3 data/apuracao.db ".backup /tmp/a.db"` e depois `gzip -9 -c /tmp/a.db > seed/apuracao.db.gz`.
+- `seed/apuracao.db.gz` é a semente do banco: bases do 1º turno e de 2022 mais o que já tinha sido coletado. Na primeira subida, com o volume vazio, o container começa dela. Para atualizar: `sqlite3 data/apuracao.db ".backup /tmp/a.db"`, depois `sqlite3 /tmp/a.db "delete from evento; delete from saude; vacuum"` (a semente não leva log) e `gzip -9 -c /tmp/a.db > seed/apuracao.db.gz`.
 - Na Railway: um serviço a partir deste repo (o `railway.json` já aponta o Dockerfile), um volume montado em `/data` e as variáveis `APURACAO_TG_TOKEN` e `APURACAO_TG_CHAT` para os avisos no Telegram. A porta vem de `PORT`, que a própria Railway define.
 - O container usa `TZ=America/Sao_Paulo`: o código compara tudo com a hora de Brasília.
 - Só uma instância deve mandar avisos. Ao ligar a Railway, desligue o Mac (`./run.sh stop`).

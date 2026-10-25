@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import os
+from urllib.parse import unquote
 import json
 import threading
 import time
@@ -52,17 +53,27 @@ class Estado:
         self.ultimo: dict | None = None
 
     def vigiar(self, intervalo: float = 60.0) -> None:
-        """Recalcula o estado sem depender do navegador e manda os avisos do Telegram."""
+        """Avisos do Telegram (só quando ligados por APURACAO_ALERTAS)."""
         while True:
             try:
-                self.get()
                 if self.ultimo:
                     alertas.verificar(self.db, self.ultimo)
             except Exception:  # noqa: BLE001 - aviso nunca derruba o servidor
                 self.db.log("aviso", "alertas: " + traceback.format_exc(limit=2))
             time.sleep(intervalo)
 
+    def recalcular_sempre(self) -> None:
+        """O estado é refeito numa thread só; quem pede /api/estado recebe o último pronto, sem esperar."""
+        while True:
+            self.atualizar()
+            time.sleep(CACHE_S)
+
     def get(self) -> bytes:
+        if self.t == 0.0:  # antes do primeiro cálculo pronto
+            self.atualizar()
+        return self.corpo
+
+    def atualizar(self) -> None:
         with self.lock:
             if time.monotonic() - self.t > CACHE_S:
                 try:
@@ -72,12 +83,12 @@ class Estado:
                     est = self._separar_fixos(est)
                     if PUBLICO:
                         est = {**est, "eventos": [{**e, "msg": str(e.get("msg", "")).split("\n")[0][:300]} for e in est.get("eventos") or []]}
-                    self.corpo = json.dumps(est, ensure_ascii=False, default=_json).encode()
+                    # allow_nan=False: NaN quebraria o JSON.parse do navegador; aqui vira erro e fica o último bom
+                    self.corpo = json.dumps(est, ensure_ascii=False, default=_json, allow_nan=False).encode()
                     self.corpo_gz = gzip.compress(self.corpo, 6)
                 except Exception:  # noqa: BLE001 - mantém o último bom e registra
                     self.db.log("erro", "painel: " + traceback.format_exc(limit=3))
                 self.t = time.monotonic()
-            return self.corpo
 
     def _separar_fixos(self, est: dict) -> dict:
         """Linha do mapa [ibge, nome, uf, eleitorado, apurado, contado, projetado, desvio, 1º turno]
@@ -112,13 +123,17 @@ def handler(est: Estado):
     class H(SimpleHTTPRequestHandler):
         server_version = "apuracao"
         sys_version = ""
-        timeout = 30  # conexão parada não prende uma thread para sempre
+        timeout = 10  # conexão parada não prende uma thread por muito tempo
 
         def __init__(self, *a, **kw):
             super().__init__(*a, directory=str(WEB), **kw)
 
         def _aceita_gzip(self) -> bool:
-            return "gzip" in (self.headers.get("Accept-Encoding") or "")
+            for parte in (self.headers.get("Accept-Encoding") or "").lower().split(","):
+                nome, _, q = parte.strip().partition(";")
+                if nome.strip() == "gzip":
+                    return q.replace(" ", "") not in ("q=0", "q=0.0", "q=0.00", "q=0.000")
+            return False
 
         def _enviar(self, corpo: bytes, tipo: str, gz: bool, cache: str) -> None:
             self.send_response(200)
@@ -134,6 +149,9 @@ def handler(est: Estado):
 
         def do_GET(self):  # noqa: N802
             caminho = self.path.split("?", 1)[0].split("#", 1)[0]
+            if "\x00" in unquote(caminho) or "\\" in unquote(caminho):
+                self.send_error(400)
+                return
             if caminho == "/api/estado":
                 gz = self._aceita_gzip()
                 self._enviar(est.get_gz() if gz else est.get(), "application/json; charset=utf-8", gz, "no-store")
@@ -147,10 +165,24 @@ def handler(est: Estado):
                 self.send_error(404)
                 return
             arq = Path(self.translate_path(caminho if caminho != "/" else "/index.html"))
-            if self._aceita_gzip() and arq.suffix in GZIP_TIPOS and arq.is_file() and arq.resolve().is_relative_to(WEB):
+            # qualquer arquivo servido precisa estar dentro de web/, mesmo via link simbólico
+            if not arq.resolve().is_relative_to(WEB.resolve()):
+                self.send_error(404)
+                return
+            if self._aceita_gzip() and arq.suffix in GZIP_TIPOS and arq.is_file():
                 self._enviar(_estatico_gz(arq), self.guess_type(str(arq)), True, "no-cache")
                 return
-            super().do_GET()
+            if self.command == "HEAD":
+                super().do_HEAD()
+            else:
+                super().do_GET()
+
+        def handle_one_request(self):
+            # cliente que some no meio, ou pedido malformado, não vira traceback no log
+            try:
+                super().handle_one_request()
+            except (ConnectionError, TimeoutError, ValueError, OSError):
+                self.close_connection = True
 
         def do_HEAD(self):  # noqa: N802
             self.do_GET()
@@ -176,6 +208,37 @@ def handler(est: Estado):
     return H
 
 
+class Servidor(ThreadingHTTPServer):
+    """Uma thread por conexão, mas com teto: além dele a conexão é recusada em vez de acumular threads."""
+
+    daemon_threads = True
+    request_queue_size = 64
+    MAX_CONEXOES = 64
+
+    def __init__(self, *a, **kw):
+        self.vagas = threading.BoundedSemaphore(self.MAX_CONEXOES)
+        super().__init__(*a, **kw)
+
+    def process_request(self, request, client_address):
+        if not self.vagas.acquire(blocking=False):
+            try:
+                request.sendall(b"HTTP/1.0 503 Service Unavailable\r\nContent-Length: 0\r\nRetry-After: 5\r\n\r\n")
+            except OSError:
+                pass
+            self.shutdown_request(request)
+            return
+        super().process_request(request, client_address)
+
+    def process_request_thread(self, request, client_address):
+        try:
+            super().process_request_thread(request, client_address)
+        finally:
+            self.vagas.release()
+
+    def handle_error(self, request, client_address):  # sem traceback por conexão no log
+        pass
+
+
 def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--porta", type=int, default=int(os.environ.get("PORT", 8000)))
@@ -185,10 +248,10 @@ def main(argv: list[str] | None = None) -> None:
     est = Estado(DB())
     # avisos: por padrão só o servidor principal (porta 8000); APURACAO_ALERTAS=1/0 decide no container
     alertas_on = os.environ.get("APURACAO_ALERTAS", "1" if a.porta == 8000 else "0") == "1"
+    threading.Thread(target=est.recalcular_sempre, daemon=True).start()
     if alertas_on and not a.sem_alertas:
         threading.Thread(target=est.vigiar, daemon=True).start()
-    srv = ThreadingHTTPServer((a.host, a.porta), handler(est))
-    srv.daemon_threads = True
+    srv = Servidor((a.host, a.porta), handler(est))
     print(f"painel em http://{a.host}:{a.porta}")
     srv.serve_forever()
 

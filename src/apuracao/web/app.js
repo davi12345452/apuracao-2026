@@ -327,7 +327,7 @@ function hero(escopo, est, p, alt, cas) {
   let cont;
   if (br) {
     const n = est.nacional || {};
-    cont = est.fase === "apurando" && n.validos ? kpi("Contado agora", lider((100 * n.lula) / n.validos), `${fmtP(n.apurado_pct, 1)} das urnas · TSE ${n.hg?.slice(0, 5) || ""}`, dCont)
+    cont = est.fase === "apurando" && n.validos ? kpi("Contado agora", lider((100 * n.lula) / n.validos), `${fmtP(n.apurado_pct, 1)} das urnas · TSE ${esc(n.hg?.slice(0, 5) || "")}`, dCont)
       : kpi("Contado agora", "—", "o TSE começa a divulgar às 17h", dCont);
   } else {
     const mu = x.mesmas_urnas || {};
@@ -402,11 +402,11 @@ function aoVivoBrasil(est) {
   const t = lt.total;
   const itens = ents.slice(0, 7).map((e) => {
     const d = e.dif_1t?.lula_pp;
-    return `<div class="av-i"><span class="h">${(e.hg || "").slice(0, 5)}</span>
+    return `<div class="av-i"><span class="h">${esc((e.hg || "").slice(0, 5))}</span>
       <span class="o"><b>${esc(e.nome)}</b><small>${e.uf.toUpperCase()} · ${fmtN(e.secoes)} seções</small></span>
       <span class="d"><b class="${e.lula_pct >= 50 ? "l" : "f"}">${liderTxt(e.lula_pct, 0)}</b>${d == null ? "" : `<small>${fmtDelta(d, 1, true)} vs 1º t.</small>`}</span></div>`;
   }).join("");
-  return `<h3>Ao vivo<span>TSE ${lt.hg || ""}</span></h3>
+  return `<h3>Ao vivo<span>TSE ${esc(lt.hg || "")}</span></h3>
     <div class="av-lote"><span class="k">Último lote · ${fmtN(t.municipios)} municípios · ${fmtMi(t.validos)} válidos</span>
       <span>${lider(t.lula_pct)} · ${fmtDelta(t.dif_pp, 1, true)} ${comTip("vs esperado", "Diferença entre o resultado do lote e o esperado para esses mesmos municípios pelo 1º turno, já com a divisão da 3ª via.")}</span></div>
     <div class="av-lista">${itens}</div>
@@ -487,7 +487,7 @@ function grafico(el, cfg) {
   if (cfg.yMin == null || cfg.yMax == null) { const pad = Math.max(1, (y1 - y0) * 0.1); if (cfg.yMin == null) y0 = Math.floor(y0 - pad); if (cfg.yMax == null) y1 = Math.ceil(y1 + pad); }
   const X = (v) => m.l + ((v - x0) / (x1 - x0 || 1)) * (W - m.l - m.r);
   const Y = (v) => m.t + (1 - (v - y0) / (y1 - y0 || 1)) * (H - m.t - m.b);
-  const passo = [1, 2, 5, 10, 20, 25].find((p) => (y1 - y0) / p <= 6) || 25;
+  const passo = [1, 2, 5, 10, 20, 25].find((p) => (y1 - y0) / p <= 6) || Math.max(25, (y1 - y0) / 6);
   const ticks = []; for (let v = Math.ceil(y0 / passo) * passo; v <= y1; v += passo) ticks.push(v);
   const yFmt = cfg.yFmt || ((v) => String(v).replace(".", ",") + "%"), tFmt = cfg.tipFmt || yFmt;
   let svg = `<svg viewBox="0 0 ${W} ${H}" style="height:${H}px" role="img" aria-label="${esc(cfg.aria || "gráfico")}">`;
@@ -779,7 +779,7 @@ function brFeed(est) {
       : `+${fmtN(e.secoes)} seções · ${fmtN(e.secoes_apur)}/${fmtN(e.secoes_tot)}`;
     const [pl, pf] = e.lula_pct == null ? [null, null] : par(e.lula_pct, 1);
     return `<div class="br-item">
-      <div class="br-mun"><b>${esc(e.nome)}</b> <span class="muted">${e.uf}</span><small>${esc(e.regiao)} · ${(e.hg || "").slice(0, 5)} · ${sec}</small></div>
+      <div class="br-mun"><b>${esc(e.nome)}</b> <span class="muted">${esc(e.uf)}</span><small>${esc(e.regiao)} · ${esc((e.hg || "").slice(0, 5))} · ${sec}</small></div>
       <div class="br-voto">${brBarraLF(e.lula_pct)}<span>Lula <b>${fmtP(pl)}</b> × Flávio <b>${fmtP(pf)}</b> <span class="muted">· ${fmtN(e.lula + e.flavio)} válidos</span></span></div>
       <div class="br-abs"><span class="k">abstenção</span> <b>${fmtP(e.abstencao_pct)}</b></div>
       <div class="br-chips">
@@ -1220,7 +1220,8 @@ function linhaTempo(el, cfg) {
     }
     svg += `<text x="${m.l}" y="${y - 8}" font-size="12" font-weight="650" fill="var(--text)">${esc(p.titulo)}</text>`;
     if (p.sub && W >= 640) svg += `<text x="${W - m.r}" y="${y - 8}" font-size="11" text-anchor="end" fill="var(--muted)">${esc(p.sub)}</text>`;
-    const passo = [0.25, 0.5, 1, 2, 5, 10, 20, 25, 50].find((q) => (y1 - y0) / q <= 4) || 50;
+    // passo cresce com a amplitude: um valor absurdo de uma API não gera um laço sem fim
+    const passo = [0.25, 0.5, 1, 2, 5, 10, 20, 25, 50].find((q) => (y1 - y0) / q <= 4) || Math.max(50, (y1 - y0) / 4);
     for (let v = Math.ceil(y0 / passo) * passo; v <= y1; v += passo) {
       svg += `<line x1="${m.l}" x2="${W - m.r}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--grid)"/>
         <text x="${m.l - 6}" y="${Y(v) + 4}" font-size="10.5" text-anchor="end" fill="var(--muted)">${esc(p.yFmt(v))}</text>`;
@@ -1450,7 +1451,7 @@ function render(est) {
   EST = est;
   const n = est.nacional, x = est.exterior || {};
   $("andamento").innerHTML = est.fase === "apurando"
-    ? `<span><b>${fmtP(n.apurado_pct, 2)}</b> apurado</span><span class="trilho"><i style="width:${n.apurado_pct}%"></i></span><span>TSE ${n.hg?.slice(0, 5) || ""}</span>`
+    ? `<span><b>${fmtP(n.apurado_pct, 2)}</b> apurado</span><span class="trilho"><i style="width:${n.apurado_pct}%"></i></span><span>TSE ${esc(n.hg?.slice(0, 5) || "")}</span>`
     : `<span>Exterior <b>${fmtN(x.secoes)}/${fmtN(x.secoes_tot)}</b> seções</span><span class="trilho"><i style="width:${x.secoes_tot ? (100 * x.secoes) / x.secoes_tot : 0}%"></i></span><span>Brasil às 17h</span>`;
   let vg = {}; try { vg = JSON.parse(est.saude?.vigia?.valor || "{}"); } catch {}
   const sd = $("saude");
