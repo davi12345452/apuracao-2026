@@ -263,48 +263,6 @@ function barraProj(p) {
   return `<div class="barra-proj"><div class="bl" style="width:${p.lula_pct}%"></div><div class="bf"></div>
     <div class="faixa" style="left:${p.p10}%;width:${Math.max(0.6, p.p90 - p.p10)}%" title="Faixa de 80%"></div><div class="meio"></div></div>`;
 }
-// o resultado de verdade das eleições anteriores no mesmo escopo, para não confundir com o modelo alternativo
-function refFinal(p, alt, x) {
-  const r = x.ref_final || {}, r22 = r["2022_2t"], r1 = r["2026_1t"];
-  const linha = (rot, v, extra) => v && v.lula_pct != null ? `<span>${rot}: <b>Lula ${fmtP(v.lula_pct)}</b>${extra || ""}</span>` : "";
-  const dif = r22 && r22.lula_pct != null ? p.lula_pct - r22.lula_pct : null;
-  return `<div class="alt ref">
-    <div class="ref-l">${linha("2º turno 2022 (resultado)", r22, dif == null ? "" : ` <span class="muted">· projeção ${dif >= 0 ? "acima" : "abaixo"} em ${fmtPPs(Math.abs(dif)).replace("+", "")} pp</span>`)}</div>
-    <div class="ref-l">${linha("1º turno 2026 (resultado, entre os dois)", r1)}</div>
-    ${alt && alt.lula_pct != null ? `<div class="ref-l muted">Outro modelo, partindo de 2022 em vez do 1º turno: Lula ${fmtP(alt.lula_pct)} (${fmtP(alt.p10)}–${fmtP(alt.p90)})</div>` : ""}
-  </div>`;
-}
-function veredito(p, alt, escopo, est) {
-  const br = escopo === "brasil";
-  const ok = br ? brOk() : !!(p && p.lula_pct != null && p.disponivel);
-  const rot = br ? "Projeção do resultado" : "Projeção do exterior";
-  if (!ok) {
-    const ap = p ? 100 * p.apurado_eleitorado : 0;
-    const t = br && est.fase !== "apurando" ? "A apuração começa às 17h" : `Esperando ${br ? 5 : 2}% apurado`;
-    const s = br && est.fase !== "apurando"
-      ? `Até lá só o exterior tem votos, e eles não dizem nada sobre o Brasil. O mapa mostra o 1º turno como referência.`
-      : `Agora: ${fmtP(ap)} do eleitorado. Com pouco voto contado, a projeção ainda seria chute.`;
-    return `<div class="rot">${rot}</div><div class="frase">${t}<small>${s}</small></div>`;
-  }
-  const f = frase(p), lado = p.margem_votos >= 0 ? "Lula" : "Flávio";
-  return `<div class="rot">${rot} · ${fmtP(100 * p.apurado_eleitorado, 0)} apurado</div>
-    <div class="frase ${f.c}">${f.t}${f.s ? `<small>${f.s}</small>` : ""}</div>
-    <div class="duelo"><div class="lado"><span class="nome">Lula · 13</span><span class="pct l">${fmtP(p.lula_pct)}</span></div>
-      <div class="lado dir"><span class="nome">Flávio · 22</span><span class="pct f">${fmtP(100 - p.lula_pct)}</span></div></div>
-    ${barraProj(p)}
-    <div class="det"><span>faixa <b>${fmtP(p.p10)}–${fmtP(p.p90)}</b></span><span>chance de Lula <b>${fmtP(p.prob_lula, 0)}</b></span><span>${lado} por <b>${fmtMi(Math.abs(p.margem_votos))}</b></span></div>
-    ${refFinal(p, alt, (br ? est.brasil : est.exterior) || {})}`;
-}
-
-function blocoContado(titulo, info, lula, validos, porque) {
-  if (!validos) return `<h3>Contado agora<span>${info}</span></h3><p class="porque">${titulo}</p>`;
-  const pl = (100 * lula) / validos;
-  return `<h3>Contado agora<span>${info}</span></h3>
-    <div class="contado-linha"><span class="v l">${fmtP(pl)}</span><span class="v f">${fmtP(100 - pl)}</span></div>
-    <div class="mini-barra"><div class="bl" style="width:${pl}%"></div><div class="bf"></div></div>
-    <p class="porque">${porque || ""}</p>`;
-}
-
 function blocoChances(nosso, pm, k, sub) {
   // disputa binária: barra dividida Lula | Flávio e, à direita, quem é o favorito e com quanto
   const linha = (q, v, cls = "") => {
@@ -316,6 +274,102 @@ function blocoChances(nosso, pm, k, sub) {
   return `<h3>Quem vence<span>${sub}</span></h3>
     <div class="chance chance-cab"><span></span><span class="lados"><span>${marca("l")}Lula</span><span>Flávio${marca("f")}</span></span><span class="v">favorito</span></div>
     ${linha("Nosso modelo", nosso, "nosso")}${linha("Polymarket", pm == null ? null : 100 * pm)}${linha("Kalshi", k == null ? null : 100 * k)}`;
+}
+
+// ================================================================ faixa do veredito (topo de Brasil e Exterior)
+const kpi = (rot, v, sub) => `<div class="hk"><span class="k">${rot}</span><b>${v}</b>${sub ? `<small>${sub}</small>` : ""}</div>`;
+const lulaV = (v) => (v == null ? "—" : `${marca(v >= 50 ? "l" : "f")}Lula ${fmtP(v)}`);
+function hero(escopo, est, p, alt, cas) {
+  const br = escopo === "brasil", x = (br ? est.brasil : est.exterior) || {};
+  const ok = br ? brOk() : !!(p && p.lula_pct != null && p.disponivel);
+  const r = x.ref_final || {}, r22 = r["2022_2t"] || {}, r1 = r["2026_1t"] || {};
+  let cont;
+  if (br) {
+    const n = est.nacional || {};
+    cont = est.fase === "apurando" && n.validos ? kpi("Contado agora", lulaV((100 * n.lula) / n.validos), `${fmtP(n.apurado_pct, 1)} das urnas · TSE ${n.hg?.slice(0, 5) || ""}`)
+      : kpi("Contado agora", "—", "o TSE começa às 17h");
+  } else {
+    const mu = x.mesmas_urnas || {};
+    cont = kpi("Contado agora", mu.validos ? lulaV((100 * mu.lula) / mu.validos) : "—", `${fmtN(x.secoes)} de ${fmtN(x.secoes_tot)} seções · último ${hora(x.ultimo_bu)}`);
+  }
+  const dif = ok && r22.lula_pct != null ? p.lula_pct - r22.lula_pct : null;
+  const k22 = kpi("2º turno 2022", lulaV(r22.lula_pct), dif == null ? "resultado final" : `resultado · projeção ${dif >= 0 ? "+" : "−"}${Math.abs(dif).toFixed(1).replace(".", ",")} pp`);
+  const k1 = kpi("1º turno 2026", lulaV(r1.lula_pct), "resultado, só entre os dois");
+  const cr = x.crescimento;
+  const kab = !br && cr ? kpi("Abstenção", fmtP(cr.abst, 1), `${fmtP(cr.abst_1t, 1)} no 1º turno, mesmas seções`)
+    : ok && p.abstencao_final_pct != null ? kpi("Abstenção projetada", fmtP(p.abstencao_final_pct, 1), `${fmtP(r1.abstencao_pct, 1)} no 1º turno`)
+    : kpi("Abstenção no 1º turno", fmtP(r1.abstencao_pct, 1), `2º turno 2022: ${fmtP(r22.abstencao_pct, 1)}`);
+  const kpis = `<div class="h-kpis">${cont}${k22}${k1}${kab}</div>`;
+  const rot = br ? "Projeção do resultado" : "Projeção do exterior";
+  if (!ok) {
+    const ap = p ? 100 * p.apurado_eleitorado : 0;
+    const t = br && est.fase !== "apurando" ? "A apuração começa às 17h" : `Esperando ${br ? 5 : 2}% apurado`;
+    const sub = br && est.fase !== "apurando"
+      ? `Até lá só o exterior tem votos, contados boletim a boletim na aba <a href="#exterior">Exterior</a>. O mapa mostra o 1º turno.`
+      : `Agora: ${fmtP(ap)} do eleitorado. Com pouco voto contado, a projeção ainda seria chute.`;
+    return `<div class="h-ver"><div class="rot">${rot}</div><div class="frase">${t}</div><p class="h-nota">${sub}</p></div>${kpis}`;
+  }
+  const f = frase(p), lado = p.margem_votos >= 0 ? "Lula" : "Flávio";
+  return `<div class="h-ver"><div class="rot">${rot} · ${fmtP(100 * p.apurado_eleitorado, 0)} apurado</div>
+      <div class="frase ${f.c}">${f.t}</div>
+      <p class="h-nota">chance de Lula <b>${fmtP(p.prob_lula, 0)}</b> · ${lado} por <b>${fmtMi(Math.abs(p.margem_votos))}</b> votos</p></div>
+    <div class="h-duelo"><div class="duelo"><div class="lado"><span class="nome">Lula · 13</span><span class="pct l">${fmtP(p.lula_pct)}</span></div>
+      <div class="lado dir"><span class="nome">Flávio · 22</span><span class="pct f">${fmtP(100 - p.lula_pct)}</span></div></div>
+      ${barraProj(p)}
+      <div class="det"><span>faixa de 80%: <b>${fmtP(p.p10)}–${fmtP(p.p90)}</b></span>${alt?.lula_pct != null ? `<span title="A mesma conta partindo do 2º turno de 2022 em vez do 1º turno de 2026">outro modelo (base 2022): ${fmtP(alt.lula_pct)}</span>` : ""}</div></div>
+    ${kpis}
+    ${cas ? `<p class="h-porque">${frasePorque(cas)}</p>` : ""}`;
+}
+
+// ================================================================ lateral: ao vivo (resumo; o completo fica em "Tudo o que entrou")
+function aoVivoExterior(est) {
+  const x = est.exterior || {}, rec = x.recentes || [], L = (x.lotes || [])[0], uh = x.placar?.ultima_hora;
+  if (!rec.length) return `<h3>Ao vivo</h3><p class="dica">Nenhum boletim do exterior ainda.</p>`;
+  const novo = feedNovos(rec);
+  const v1 = L?.vs_1t;
+  const lote = L ? `<div class="av-lote"><span class="k">${hora(L.de)}–${hora(L.ate)} · ${L.boletins} ${L.boletins === 1 ? "boletim" : "boletins"} · ${esc(listaPaises(L.paises, 2))}</span>
+      <span>Lula <b>${fmtP(L.lula_pct)}</b>${v1 && L.secao_1t ? ` · desde o 1º turno: ${marca("l")}<b>${sinalN(v1.lula - v1.lula_antes)}</b> ${marca("f")}<b>${sinalN(v1.flavio - v1.flavio_antes)}</b>` : ""}</span></div>` : "";
+  // boletins seguidos da mesma cidade no mesmo minuto viram uma linha só
+  const grupos = [];
+  for (const r of rec) {
+    const g = grupos[grupos.length - 1];
+    if (g && g.cidade === r.cidade && hora(g.t) === hora(r.t)) g.rs.push(r);
+    else { if (grupos.length >= 7) break; grupos.push({ cidade: r.cidade, pais: r.pais, t: r.t, rs: [r] }); }
+  }
+  const itens = grupos.map((g) => {
+    const soma = (f) => g.rs.reduce((a, r) => a + f(r), 0);
+    const L = soma((r) => r.lula), F = soma((r) => r.flavio), pl = L + F ? (100 * L) / (L + F) : null;
+    const com = g.rs.filter((r) => r.v_1t), ap = com.some((r) => r.ref_1t === "cidade") ? "≈" : "";
+    const dL = com.reduce((a, r) => a + r.lula - r.v_1t.lula, 0), dF = com.reduce((a, r) => a + r.flavio - r.v_1t.flavio, 0);
+    const n = g.rs.length;
+    return `<div class="av-i ${g.rs.some(novo) ? "novo" : ""}"><span class="h">${hora(g.t)}</span>
+      <span class="o"><b>${esc(g.cidade)}</b><small>${esc(g.pais)} · ${n === 1 ? `seção ${+g.rs[0].secao}` : `${n} seções`}</small></span>
+      <span class="d"><b class="${pl >= 50 ? "l" : "f"}">Lula ${fmtP(pl, 0)}</b>${com.length ? `<small>L ${ap}${sinalN(dL)} · F ${ap}${sinalN(dF)}</small>` : ""}</span></div>`;
+  }).join("");
+  return `<h3>Ao vivo<span>último boletim ${hora(x.ultimo_bu)}</span></h3>
+    ${uh && uh.secoes ? `<p class="av-uh">Na última hora: <b>+${fmtN(uh.secoes)}</b> seções · Lula +${fmtN(uh.lula)} · Flávio +${fmtN(uh.flavio)}</p>` : ""}
+    ${lote}<div class="av-lista">${itens}</div>
+    <p class="dica">L e F: votos que Lula e Flávio ganharam na mesma seção desde o 1º turno.</p>
+    <button class="av-mais" data-rolar="feed-painel">Ver tudo o que entrou ↓</button>`;
+}
+function aoVivoBrasil(est) {
+  const a = est.brasil?.analise;
+  if (est.fase !== "apurando" || !a) return `<h3>Ao vivo</h3><p class="dica">Começa às 17h: cada atualização do TSE, município a município, comparada com o 1º turno.</p>`;
+  const lt = (a.lotes || [])[0], ents = a.entradas || [];
+  if (!lt || !ents.length) return `<h3>Ao vivo</h3><p class="dica">Esperando a primeira atualização com votos por município.</p>`;
+  const t = lt.total;
+  const itens = ents.slice(0, 7).map((e) => {
+    const d = e.dif_1t?.lula_pp;
+    return `<div class="av-i"><span class="h">${(e.hg || "").slice(0, 5)}</span>
+      <span class="o"><b>${esc(e.nome)}</b><small>${e.uf.toUpperCase()} · ${fmtN(e.secoes)} seções</small></span>
+      <span class="d"><b class="${e.lula_pct >= 50 ? "l" : "f"}">Lula ${fmtP(e.lula_pct, 0)}</b>${d == null ? "" : `<small>${brDot(brQuem(d, 0.05))}${fmtPP(d)} vs 1º t.</small>`}</span></div>`;
+  }).join("");
+  return `<h3>Ao vivo<span>TSE ${lt.hg || ""}</span></h3>
+    <div class="av-lote"><span class="k">Último lote · ${fmtN(t.municipios)} municípios · ${fmtMi(t.validos)} válidos</span>
+      <span>Lula <b>${fmtP(t.lula_pct)}</b> · ${brDot(brQuem(t.dif_pp, 0.05))}${fmtPP(t.dif_pp)} vs o esperado ali</span></div>
+    <div class="av-lista">${itens}</div>
+    <p class="dica">vs 1º t.: Lula entre os dois agora × no 1º turno, no mesmo município.</p>
+    <button class="av-mais" data-rolar="feed-painel">Ver tudo o que entrou ↓</button>`;
 }
 
 // ================================================================ cascata: do contado à projeção
@@ -487,7 +541,7 @@ const listaPaises = (ps, n = 3) => {
 };
 function renderFeedExterior(est) {
   const x = est.exterior || {}, rec = x.recentes || [], lotes = x.lotes || [];
-  $("feed-titulo").textContent = "O que acabou de entrar";
+  $("feed-titulo").textContent = "Tudo o que entrou";
   $("feed-sub").textContent = "boletins na ordem em que o TSE recebeu · horário de Brasília";
   if (!rec.length) { $("feed").innerHTML = `<div class="vazio">Nenhum boletim do exterior ainda.</div>`; return; }
   const novo = feedNovos(rec);
@@ -502,7 +556,6 @@ function renderFeedExterior(est) {
     ${L.vs_1t && L.secao_1t ? `<span class="sep">·</span> <b>desde o 1º turno${L.secao_1t < L.boletins ? ` (${L.secao_1t} seções)` : ""}: Lula ${sinalN(L.vs_1t.lula - L.vs_1t.lula_antes)}, Flávio ${sinalN(L.vs_1t.flavio - L.vs_1t.flavio_antes)}</b> <span class="muted">(3ª via tinha ${fmtN(L.vs_1t.outros_antes)})</span>` : ""}
     <span class="sep">·</span> abstenção <b>${fmtP(L.abstencao_pct, 0)}</b> <span class="muted">(1º turno: ${fmtP(L.abstencao_1t_pct, 0)})</span>
     ${nNovos ? `<span class="fx-novos">${nNovos} ${nNovos === 1 ? "novo" : "novos"} desde a última atualização</span>` : ""}</div>` : "";
-  renderPlacarExterior(x.placar, x.crescimento);
   // ---------- boletins: os 10 mais recentes, o resto ao expandir (sem rolagem interna) ----------
   const N_BU = 10, N_LOTES = 6;
   const recVis = expandido["fx-bu"] ? rec : rec.slice(0, N_BU);
@@ -536,61 +589,22 @@ function renderFeedExterior(est) {
     <p class="nota-leitura">Votos ganhos ou perdidos por cada um na mesma seção. Os dois podem crescer ao mesmo tempo: no 2º turno os votos da 3ª via (e quem não tinha ido votar) se dividem entre eles. "Média da cidade" (e ≈) só quando a seção não existia na outra eleição.</p></div></div>`;
 }
 
-// placar do exterior em números brutos, no topo da aba (inserido antes do mapa; só aparece na aba Exterior)
-function renderPlacarExterior(pl, cr) {
-  let el = $("ext-placar");
-  if (!el) {
-    el = document.createElement("section");
-    el.id = "ext-placar";
-    el.className = "ext-placar";
-    const palco = document.querySelector("#aba-mapa .palco");
-    palco.parentNode.insertBefore(el, palco);
-  }
-  if (!pl) { el.innerHTML = ""; return; }
-  const dif = (a, b) => { const d = a - b; return `<span class="xp-d">${d > 0 ? "+" : d < 0 ? "−" : "±"}${fmtN(Math.abs(d))}</span>`; };
-  const linhaVs = (nome, c, agora, antes, rotAntes) => `<div class="xp-l">${c ? marca(c) : `<i class="mk-m e"></i>`}<span class="n">${nome}</span>
-    <b>${fmtN(agora)}</b><span class="a">${rotAntes} ${fmtN(antes)}</span>${dif(agora, antes)}</div>`;
-  // agora × antes nas seções que existem nas duas eleições (casadas por município+zona+seção)
-  const cmp = (v, titulo, rot, rotF) => `<div class="xp-card"><div class="rot">${titulo}</div>
-    <div class="xp-sub">${fmtN(v.secoes)} de ${fmtN(pl.secoes)} seções apuradas existem nas duas</div>
-    ${linhaVs("Lula", "l", v.lula, v.lula_antes, rot)}${linhaVs("Flávio", "f", v.flavio, v.flavio_antes, rotF)}
-    ${linhaVs("Votaram", "", v.comparecimento, v.comparecimento_antes, rot)}</div>`;
-  const pS = pl.secoes_tot ? (100 * pl.secoes) / pl.secoes_tot : 0, pE = pl.eleitorado ? (100 * pl.eleitores) / pl.eleitorado : 0;
-  const pL = pl.validos ? (100 * pl.lula) / pl.validos : null, uh = pl.ultima_hora || {};
-  const saldoC = pl.saldo > 0 ? "l" : pl.saldo < 0 ? "f" : "";
-  el.innerHTML = `
-    <div class="xp-card"><div class="rot">Apurado no exterior</div>
-      <div class="xp-big">${fmtN(pl.secoes)}<small> de ${fmtN(pl.secoes_tot)} seções</small></div>
-      <div class="xp-trilho"><i style="width:${pS}%"></i></div>
-      <div class="xp-sub">${fmtP(pS)} das seções · ${fmtMi(pl.eleitores)} de ${fmtMi(pl.eleitorado)} eleitores (${fmtP(pE)}) · ${fmtN(pl.comparecimento)} votaram</div></div>
-    <div class="xp-card"><div class="rot">Votos válidos contados</div>
-      <div class="xp-big">${fmtN(pl.validos)}</div>
-      ${pL == null ? "" : `<div class="xp-duelo"><span>${marca("l")}Lula <b>${fmtN(pl.lula)}</b></span><span>Flávio <b>${fmtN(pl.flavio)}</b>${marca("f")}</span></div>
-      <div class="xp-barra"><i class="bl" style="width:${pL}%"></i><i class="bf"></i></div>`}
-      <div class="xp-sub">${saldoC ? `${marca(saldoC)}${NOME_LADO[saldoC]} à frente por <b>${fmtN(Math.abs(pl.saldo))}</b> votos` : "empate"} · ${fmtN(pl.brancos)} brancos · ${fmtN(pl.nulos)} nulos</div></div>
-    ${cmp(pl.vs_1t, "Mesmas seções × 1º turno 2026", "1º t.", "1º t.")}
-    ${cmp(pl.vs_2022, "Mesmas seções × 2º turno 2022", "2022", "Bolsonaro")}
-    <div class="xp-card"><div class="rot">Última hora</div>
-      <div class="xp-big">+${fmtN(uh.secoes)}<small> seções</small></div>
-      <div class="xp-l">${marca("l")}<span class="n">Lula</span><b>+${fmtN(uh.lula)}</b></div>
-      <div class="xp-l">${marca("f")}<span class="n">Flávio</span><b>+${fmtN(uh.flavio)}</b></div>
-      <div class="xp-sub">pela hora em que o TSE recebeu</div></div>
-    ${cartaoCrescimento(cr)}`;
-}
-
 // por que cada um cresceu desde o 1º turno: 3ª via × quem passou a votar, e onde a abstenção caiu
-function cartaoCrescimento(c) {
+// números grandes (Brasil) em mil/mi para caber nas colunas
+const fmtC = (x) => (Math.abs(x) >= 1e5 ? fmtMi(x) : fmtN(x));
+const sinalC = (d) => (d > 0 ? "+" : d < 0 ? "−" : "±") + fmtC(Math.abs(d));
+function cartaoCrescimento(c, pl) {
   if (!c || !c.candidatos) return "";
-  const L = c.candidatos.lula, F = c.candidatos.flavio, D = c.d_comparecimento;
+  const L = c.candidatos.lula, F = c.candidatos.flavio, D = c.d_comparecimento, v22 = pl?.vs_2022;
   const voltou = D >= 0 ? "de quem não tinha votado no 1º turno" : "de quem votou no 1º turno e não voltou";
   const escala = Math.max(1, ...[L, F].map((x) => Math.max(0, x.da_3via) + Math.max(0, x.do_comparecimento)));
   const linha = (nome, lado, x) => `<div class="cr-l">
-      <span class="cr-n">${marca(lado)}${nome}</span><b class="cr-g">${sinalN(x.ganho)}</b>
+      <span class="cr-n">${marca(lado)}${nome}</span><b class="cr-g">${sinalC(x.ganho)}</b>
       <div class="cr-barra">
-        <i class="s ${lado}" style="width:${(100 * Math.max(0, x.da_3via)) / escala}%" title="da 3ª via: ~${fmtN(x.da_3via)}"></i>
-        <i class="r ${lado}" style="width:${(100 * Math.max(0, x.do_comparecimento)) / escala}%" title="${voltou}: ~${fmtN(x.do_comparecimento)}"></i>
+        <i class="s ${lado}" style="width:${(100 * Math.max(0, x.da_3via)) / escala}%" title="da 3ª via: ~${fmtC(x.da_3via)}"></i>
+        <i class="r ${lado}" style="width:${(100 * Math.max(0, x.do_comparecimento)) / escala}%" title="${voltou}: ~${fmtC(x.do_comparecimento)}"></i>
       </div>
-      <span class="cr-p"><b>~${fmtN(x.da_3via)}</b> da 3ª via · <b>~${fmtN(x.do_comparecimento)}</b> ${D >= 0 ? "de quem voltou a votar" : "de quem deixou de votar"}</span>
+      <span class="cr-p"><b>~${fmtC(x.da_3via)}</b> da 3ª via · <b>~${fmtC(x.do_comparecimento)}</b> ${D >= 0 ? "de quem voltou a votar" : "de quem deixou de votar"}</span>
     </div>`;
   const pp = (a, b) => (a == null || b == null ? null : a - b);
   const saldoAbst = L.do_comparecimento - F.do_comparecimento, saldo3 = L.da_3via - F.da_3via;
@@ -599,18 +613,18 @@ function cartaoCrescimento(c) {
   const frase = `<b>Lula</b> cresceu sobretudo ${fonte(L)} e <b>Flávio</b>, ${fonte(F)}.
     Dos eleitores que ${D >= 0 ? "passaram a votar" : "deixaram de votar"}, cerca de <b>${fmtP(L.fatia_novos, 0)}</b> ${D >= 0 ? "foram para" : "eram de"} Lula;
     da 3ª via, cerca de <b>${fmtP(F.fatia_3via, 0)}</b> foi para Flávio e <b>${fmtP(L.fatia_3via, 0)}</b> para Lula.
-    No saldo, a mudança na abstenção rendeu <b>${quem(saldoAbst)} +${fmtN(Math.abs(saldoAbst))}</b> votos de vantagem e a 3ª via rendeu <b>${quem(saldo3)} +${fmtN(Math.abs(saldo3))}</b>.`;
+    No saldo, a mudança na abstenção rendeu <b>${quem(saldoAbst)} +${fmtC(Math.abs(saldoAbst))}</b> votos de vantagem e a 3ª via rendeu <b>${quem(saldo3)} +${fmtC(Math.abs(saldo3))}</b>.`;
   // onde a abstenção caiu
   const gs = c.grupos || [];
   const vals = gs.flatMap((g) => [g.abst_1t, g.abst]).filter((v) => v != null);
   const lo = Math.floor(Math.min(...vals) - 1), hi = Math.ceil(Math.max(...vals) + 1), xp = (v) => (100 * (v - lo)) / (hi - lo);
   const halter = (a, b) => `<div class="cr-halter"><span class="ln" style="left:${Math.min(xp(a), xp(b))}%;width:${Math.abs(xp(a) - xp(b))}%"></span>
       <i class="d0" style="left:${xp(a)}%" title="1º turno ${fmtP(a)}"></i><i class="d1" style="left:${xp(b)}%" title="agora ${fmtP(b)}"></i></div>`;
-  const linhasG = gs.map((g) => `<tr><td><b>${marca(g.lado)}${g.nome}</b><small>Lula tinha ${g.de === 0 ? `menos de ${g.ate}%` : g.ate >= 100 ? `${g.de}% ou mais` : `${g.de}–${g.ate}%`} no 1º turno · ${fmtN(g.secoes)} seções</small></td>
+  const linhasG = gs.map((g) => `<tr><td><b>${marca(g.lado)}${g.nome}</b><small>Lula tinha ${g.de === 0 ? `menos de ${g.ate}%` : g.ate >= 100 ? `${g.de}% ou mais` : `${g.de}–${g.ate}%`} no 1º turno · ${fmtN(g.unidades)} ${c.unidade}</small></td>
       <td class="cr-ab">${halter(g.abst_1t, g.abst)}<small>${fmtP(g.abst_1t, 1)} → <b>${fmtP(g.abst, 1)}</b></small></td>
       <td><b>${fmtPPs(pp(g.abst, g.abst_1t))} pp</b><small>abstenção</small></td>
-      <td><b>${sinalN(g.d_comparecimento)}</b><small>votantes</small></td>
-      <td><b>${sinalN(g.lula)}</b><small>Lula</small></td><td><b>${sinalN(g.flavio)}</b><small>Flávio</small></td></tr>`).join("");
+      <td><b>${sinalC(g.d_comparecimento)}</b><small>votantes</small></td>
+      <td><b>${sinalC(g.lula)}</b><small>Lula</small></td><td><b>${sinalC(g.flavio)}</b><small>Flávio</small></td></tr>`).join("");
   const gL = gs.filter((g) => g.lado === "l").slice(-1)[0], gF = gs.filter((g) => g.lado === "f")[0];
   const fraseG = gL && gF ? (() => {
     const qL = -pp(gL.abst, gL.abst_1t), qF = -pp(gF.abst, gF.abst_1t);
@@ -619,16 +633,17 @@ function cartaoCrescimento(c) {
       + (lado ? `a mobilização foi maior em lugar pró-${lado}, o que ajudou <b>${lado}</b>.` : "a mobilização foi parecida nos dois lados.");
   })() : "";
   // países que mais mudaram de comparecimento
-  const ps = (c.paises || []).slice(0, 8);
+  const ps = (c.lugares || []).slice(0, 8);
   const linhasP = ps.map((x) => {
     const lado = x.lula_1t_pct >= 50 ? "l" : "f";
-    return `<tr><td><b>${marca(lado)}${esc(x.pais)}</b><small>${fmtN(x.secoes)} seções · Lula tinha ${fmtP(x.lula_1t_pct, 0)} no 1º t.</small></td>
-      <td>${fmtP(x.abst_1t, 1)} → <b>${fmtP(x.abst, 1)}</b><small>${fmtPPs(x.abst - x.abst_1t)} pp</small></td><td><b>${sinalN(x.d_comparecimento)}</b><small class="so-cel">votantes</small></td>
-      <td><b>${sinalN(x.lula)}</b><small class="so-cel">Lula</small></td><td><b>${sinalN(x.flavio)}</b><small class="so-cel">Flávio</small></td></tr>`;
+    return `<tr><td><b>${marca(lado)}${esc(x.lugar)}</b><small>${fmtN(x.unidades)} ${c.unidade} · Lula tinha ${fmtP(x.lula_1t_pct, 0)} no 1º t.</small></td>
+      <td>${fmtP(x.abst_1t, 1)} → <b>${fmtP(x.abst, 1)}</b><small>${fmtPPs(x.abst - x.abst_1t)} pp</small></td><td><b>${sinalC(x.d_comparecimento)}</b><small class="so-cel">votantes</small></td>
+      <td><b>${sinalC(x.lula)}</b><small class="so-cel">Lula</small></td><td><b>${sinalC(x.flavio)}</b><small class="so-cel">Flávio</small></td></tr>`;
   }).join("");
   return `<div class="xp-card cr">
     <div class="rot">Por que cada um cresceu desde o 1º turno</div>
-    <div class="xp-sub">${fmtN(c.secoes)} seções que existem nos dois turnos · abstenção ${fmtP(c.abst_1t, 1)} → <b>${fmtP(c.abst, 1)}</b> · ${sinalN(D)} votantes · a 3ª via tinha ${fmtN(c.outros_1t)} votos</div>
+    <div class="xp-sub">${c.unidade === "seções" ? `${fmtN(c.unidades)} seções que existem nos dois turnos` : `${fmtN(c.unidades)} municípios com voto, contra o 1º turno nas mesmas urnas`} · abstenção ${fmtP(c.abst_1t, 1)} → <b>${fmtP(c.abst, 1)}</b> · ${sinalC(D)} votantes · a 3ª via tinha ${fmtC(c.outros_1t)} votos</div>
+    ${v22 && v22.secoes ? `<div class="xp-sub">Contra o 2º turno de 2022, nas ${fmtN(v22.secoes)} seções que já existiam: Lula <b>${sinalC(v22.lula - v22.lula_antes)}</b>, Flávio <b>${sinalC(v22.flavio - v22.flavio_antes)}</b> em relação a Bolsonaro, comparecimento <b>${sinalC(v22.comparecimento - v22.comparecimento_antes)}</b>.</div>` : ""}
     <div class="cr-grade">
       <div>
         ${linha("Lula", "l", L)}${linha("Flávio", "f", F)}
@@ -642,9 +657,9 @@ function cartaoCrescimento(c) {
         <p class="fl-frase">${fraseG}</p>
       </div>
     </div>
-    ${linhasP ? `<details class="cr-paises"><summary>Por país: onde mais gente passou a votar</summary>
-      <table class="tabela"><thead><tr><th>País (cor: quem venceu ali no 1º turno)</th><th>Abstenção</th><th>Votantes</th><th>Lula</th><th>Flávio</th></tr></thead><tbody>${linhasP}</tbody></table></details>` : ""}
-    <p class="xp-sub">Estimativa pelo padrão entre as seções (onde havia mais 3ª via, quanto cada um cresceu; onde mais gente voltou a votar, quanto cada um cresceu), não o voto de cada eleitor. Faixa de 80%: 3ª via para Lula ${fmtP(L.fatia_3via_faixa[0], 0)}–${fmtP(L.fatia_3via_faixa[1], 0)}; novos votantes para Lula ${fmtP(L.fatia_novos_faixa[0], 0)}–${fmtP(L.fatia_novos_faixa[1], 0)}.</p>
+    ${linhasP ? `<details class="cr-paises"><summary>Por ${c.tipo_lugar}: onde o comparecimento mais mudou</summary>
+      <table class="tabela"><thead><tr><th>${c.tipo_lugar === "país" ? "País" : "Estado"} (cor: quem venceu ali no 1º turno)</th><th>Abstenção</th><th>Votantes</th><th>Lula</th><th>Flávio</th></tr></thead><tbody>${linhasP}</tbody></table></details>` : ""}
+    <p class="xp-sub">Estimativa pelo padrão entre ${c.unidade === "seções" ? "as seções" : "os municípios"} (onde havia mais 3ª via, quanto cada um cresceu; onde mais gente voltou a votar, quanto cada um cresceu), não o voto de cada eleitor. Faixa de 80%: 3ª via para Lula ${fmtP(L.fatia_3via_faixa[0], 0)}–${fmtP(L.fatia_3via_faixa[1], 0)}; novos votantes para Lula ${fmtP(L.fatia_novos_faixa[0], 0)}–${fmtP(L.fatia_novos_faixa[1], 0)}.</p>
   </div>`;
 }
 
@@ -678,12 +693,12 @@ function renderFeedBrasil(est) {
 function renderAnaliseBrasil(est) {
   try { brAnalise(est); } catch (e) {
     console.error("análises do Brasil:", e);
-    $("br-analise").innerHTML = brVazio("Análises do Brasil", "Não deu para montar as análises agora; tenta de novo na próxima atualização.");
+    $("porque").innerHTML = brVazio("Análises do Brasil", "Não deu para montar as análises agora; tenta de novo na próxima atualização.");
   }
 }
 function brFeed(est) {
   const a = est.brasil?.analise;
-  $("feed-titulo").textContent = "O que acabou de entrar";
+  $("feed-titulo").textContent = "Tudo o que entrou";
   if (est.fase !== "apurando" || !a) {
     $("feed-sub").textContent = "";
     $("feed").innerHTML = `<div class="vazio">Aparece às 17h: cada atualização do TSE, município a município, comparada com o 1º turno e com 2022.</div>`;
@@ -818,14 +833,19 @@ function brTerceira(a, cedo, min) {
     <p class="nota-leitura">Quanto Lula, Flávio, brancos e nulos e a abstenção variaram do 1º para o 2º turno, como fração dos votos da 3ª via. É conta agregada, não fluxo de eleitores: quem votou em Lula no 1º turno pode ter faltado e ser compensado por outro. A linha marca 0% e 100%. Em municípios ainda parciais, parte do número é ordem de apuração. Regressão: a parte da 3ª via que foi para Lula estimada entre municípios, a que a projeção usa.</p></section>`;
 }
 function brAnalise(est) {
-  const a = est.brasil?.analise, el = $("br-analise");
+  const a = est.brasil?.analise, el = $("porque");
   if (est.fase !== "apurando" || !a || !a.total?.validos) {
-    el.innerHTML = brVazio("De onde vêm os votos", "Aparece às 17h: quanto do contado vem de cada região, comparado com o peso dela no 1º turno.")
-      + `<div class="br-dupla">${brVazio("Abstenção: quem ela prejudica", "Aparece às 17h: abstenção agora × 1º turno × 2022 e o efeito no saldo.")}${brVazio("Para onde foi a 3ª via", "Aparece às 17h: o que mudou do 1º para o 2º turno, região a região.")}</div>`;
+    el.innerHTML = `<section class="painel"><header><h2>Por que cada um cresce</h2><p>aparece às 17h</p></header>
+      <ul class="lista-espera"><li><b>De onde vêm os votos:</b> quanto do contado vem de cada região, comparado com o peso dela no 1º turno.</li>
+      <li><b>Abstenção:</b> onde ela subiu ou caiu e a quem isso prejudica.</li>
+      <li><b>3ª via:</b> para onde foram, região a região, os votos dos outros candidatos do 1º turno.</li></ul></section>`;
     return;
   }
   const min = est.min_apurado ?? 5, cedo = !(a.total.apurado_pct >= min);
-  el.innerHTML = brOrigem(a) + `<div class="br-dupla">${brAbstencao(a, cedo, min)}${brTerceira(a, cedo, min)}</div>`;
+  const cr = cedo ? "" : cartaoCrescimento(est.brasil.crescimento);
+  el.innerHTML = (cr || "") + brOrigem(a) + `<details class="painel br-det" ${expandido["br-det"] ? "open" : ""}><summary><h2>Região por região: abstenção e 3ª via</h2><span>contabilidade nas mesmas urnas</span></summary>
+    <div class="br-dupla">${brAbstencao(a, cedo, min)}${brTerceira(a, cedo, min)}</div></details>`;
+  el.querySelector(".br-det").addEventListener("toggle", (ev) => { expandido["br-det"] = ev.target.open; });
 }
 
 // ================================================================ método (recolhido)
@@ -887,17 +907,16 @@ function renderBrasil(est) {
   const b = est.brasil || {}, P = b.modelos || {}, p = P[MODELO], alt = P[MODELO_ALT];
   MUN = {}; for (const r of b.mapa || []) MUN[r[0]] = r;
   const ok = brOk(), n = est.nacional, mk = est.mercados || {};
-  $("veredito").innerHTML = veredito(p, alt, "brasil", est);
   const cas = ok ? passosCascata(p, agruparRegioes(p.por_uf), (g) => g.grupo) : null;
-  $("contado").innerHTML = est.fase === "apurando"
-    ? blocoContado("", `${fmtP(n.apurado_pct, 1)} das urnas · TSE ${n.hg?.slice(0, 5) || ""}`, n.lula, n.validos, ok ? frasePorque(cas) : "Com tão pouco contado, quem chegou primeiro ainda pesa demais.")
-    : blocoContado(`O TSE começa a totalizar às 17h. Até lá o exterior é contado boletim a boletim: veja a aba <a href="#exterior">Exterior</a>.`, "", 0, 0);
+  $("hero").innerHTML = hero("brasil", est, p, alt, cas);
+  $("aovivo").innerHTML = aoVivoBrasil(est);
   $("chances").innerHTML = blocoChances(ok ? p.prob_lula : null, mk.polymarket?.p_lula, mk.kalshi?.p_lula, "Brasil");
   // seleção
   const u = sel.brasil;
   if (u) {
     const g = (p?.por_uf || []).find((x) => x.grupo === u), r1 = (b.por_uf || []).find((x) => x.uf.toLowerCase() === u);
-    $("selecao").innerHTML = `<div class="nome-sel">${esc(r1?.nome || u.toUpperCase())}</div>
+    $("selecao").hidden = false;
+    $("selecao").innerHTML = `<button class="sel-x" data-sel="" aria-label="Fechar">×</button><div class="nome-sel">${esc(r1?.nome || u.toUpperCase())}</div>
       <div class="sub-sel">${fmtP(g?.apurado_pct ?? r1?.apurado_pct, 1)} apurado · ${fmtMi(g?.eleitorado)} eleitores</div>
       <div class="grade-sel">
         <div><span class="k">Lula no contado</span><span class="v">${fmtP(g?.lula_contado_pct)}</span></div>
@@ -906,10 +925,10 @@ function renderBrasil(est) {
         <div><span class="k">Saldo do que falta</span><span class="v ${sinal(g?.saldo_esperado)}">${ok ? fmtS(g?.saldo_esperado) : "—"}</span></div>
       </div><p class="selecao dica" style="margin:10px 0 0">* entre Lula e Flávio</p>`;
   } else {
-    $("selecao").innerHTML = `<h3>Explorar</h3><p class="dica">Passe o mouse num município para ver os números. Clique para abrir o estado.</p>`;
+    $("selecao").hidden = true;
   }
-  $("cascata-titulo").textContent = "Do contado à projeção";
-  $("cascata-sub").textContent = ok ? "o que falta de cada região, somado ao contado" : "";
+  $("cascata-titulo").textContent = "O que falta";
+  $("cascata-sub").textContent = ok ? "do contado à projeção, região por região" : "";
   $("cascata").innerHTML = ok ? cascata(cas) + `<p class="cascata-nota">Cada linha soma ao contado os votos que ainda faltam de uma região, com a fatia que esperamos de Lula ali.</p>` : `<div class="vazio">Aparece com 5% do eleitorado apurado, depois das 17h.</div>`;
   const hist = (b.hist || []).filter((h) => h.modelo === MODELO);
   $("noite-sub").textContent = hist.length ? `${hist.length} atualizações do TSE` : "";
@@ -933,7 +952,6 @@ function renderBrasil(est) {
   }
   $("tabela-mais").innerHTML = "";
   renderFeedBrasil(est);
-  $("br-analise").hidden = false;
   renderAnaliseBrasil(est);
   renderMetodo(p, "brasil", est);
 }
@@ -958,15 +976,16 @@ function renderExterior(est) {
   const ok = !!(p && p.disponivel && p.lula_pct != null);
   const proj = {}; for (const g of p?.por_pais || []) proj[g.grupo] = g;
   PAIS = {}; for (const r of x.paises || []) if (r.iso3) PAIS[r.iso3] = { ...r, proj: ok ? proj[r.pais] : null };
-  $("veredito").innerHTML = veredito(p, alt, "exterior", est);
   const cas = ok ? passosCascata(p, agruparPaises(p.por_pais), (g) => g.grupo) : null;
-  const mu = x.mesmas_urnas || {};
-  $("contado").innerHTML = blocoContado("Ainda sem boletins do exterior.", `${fmtN(x.secoes)} de ${fmtN(x.secoes_tot)} seções · último ${hora(x.ultimo_bu)}`, mu.lula, mu.validos,
-    ok ? frasePorque(cas) : "");
+  $("hero").innerHTML = hero("exterior", est, p, alt, cas);
+  $("aovivo").innerHTML = aoVivoExterior(est);
+  $("porque").innerHTML = cartaoCrescimento(x.crescimento, x.placar)
+    || `<section class="painel"><header><h2>Por que cada um cresce</h2></header><div class="vazio">Aparece com 20 seções que existem nos dois turnos.</div></section>`;
   $("chances").innerHTML = blocoChances(ok ? p.prob_lula : null, mk.polymarket?.exterior_lula, mk.kalshi?.exterior_lula, "no exterior");
   const s = sel.exterior && PAIS[sel.exterior];
   if (s) {
-    $("selecao").innerHTML = `<div class="nome-sel">${esc(s.pais)}</div>
+    $("selecao").hidden = false;
+    $("selecao").innerHTML = `<button class="sel-x" data-sel="" aria-label="Fechar">×</button><div class="nome-sel">${esc(s.pais)}</div>
       <div class="sub-sel">${s.secoes} de ${s.secoes_tot} seções · ${fmtN(s.eleitorado)} eleitores</div>
       <div class="grade-sel">
         <div><span class="k">Lula no contado</span><span class="v">${s.secoes ? fmtP(s.lula_pct) : "—"}</span></div>
@@ -975,10 +994,10 @@ function renderExterior(est) {
         <div><span class="k">Saldo do que falta</span><span class="v ${sinal(s.proj?.saldo_esperado)}">${s.proj ? fmtS(s.proj.saldo_esperado) : "—"}</span></div>
       </div><p class="dica" style="margin:10px 0 0">* entre Lula e Flávio, no país inteiro</p>`;
   } else {
-    $("selecao").innerHTML = `<h3>Explorar</h3><p class="dica">Passe o mouse num país ou numa bolha. Clique para aproximar. A bolha é proporcional ao eleitorado.</p>`;
+    $("selecao").hidden = true;
   }
-  $("cascata-titulo").textContent = "Do contado à projeção";
-  $("cascata-sub").textContent = ok ? "o que falta dos países que mais pesam" : "";
+  $("cascata-titulo").textContent = "O que falta";
+  $("cascata-sub").textContent = ok ? "do contado à projeção, pelos países que mais pesam" : "";
   $("cascata").innerHTML = ok ? cascata(cas) + `<p class="cascata-nota">Cada linha soma ao contado os votos que ainda faltam de um país, com a fatia que esperamos de Lula ali.</p>` : `<div class="vazio">Aparece com 2% do eleitorado do exterior apurado.</div>`;
   const h = x.hist || [];
   $("noite-sub").textContent = "hora em que o TSE recebeu cada boletim";
@@ -1000,7 +1019,6 @@ function renderExterior(est) {
     r.secoes_tot ? (100 * r.secoes) / r.secoes_tot : 0, r.secoes ? r.lula_pct : null, r.proj?.lula_final_pct, ok ? r.saldo : null, max)).join("")}</tbody>`;
   $("tabela-mais").innerHTML = linhas.length > 15 ? `<button class="mais" data-exp="paises">${expandido.paises ? "Mostrar só os 15 maiores" : `Mostrar todos (${linhas.length})`}</button>` : "";
   renderFeedExterior(est);
-  $("br-analise").hidden = true;
   renderMetodo(p, "exterior", est);
 }
 
@@ -1187,7 +1205,7 @@ function renderMercados(est) {
   const mk = est.mercados || {}, pm = mk.polymarket || {}, k = mk.kalshi || {}, mv = est.movimentos;
   if (!mv) { $("mk-agora").innerHTML = `<div class="vazio">Histórico dos mercados ainda não carregado.</div>`; return; }
   const S = mv.series, agora = mv.agora_min;
-  const ok = brOk(), p = est.brasil?.modelos?.[MODELO];
+  const ok = brOk(), p = est.brasil?.modelos?.[MODELO], pe = est.exterior?.modelos?.[MODELO];
   // ---------- agora ----------
   const delta = (s, desde) => { const a = ultimo(s, desde), b = ultimo(s, agora); return a == null || b == null ? null : b - a; };
   const marg = S.fatia.map((q) => [q[0], margemDe(q[1])]);
@@ -1213,7 +1231,8 @@ function renderMercados(est) {
       <div class="mk-linha"><span>desde 00h</span>${fmtDelta(delta(marg, 0), 2)}</div><div class="mk-linha"><span>última hora</span>${fmtDelta(delta(marg, agora - 60), 2)}</div>`,
       "diferença entre os dois nos votos válidos, mediana implícita na escada") +
     cardVence("Quem vence no exterior", [
-      { nome: "Polymarket", v: pct(pm.exterior_lula), d: delta(S.poly_ext, 0) }, { nome: "Kalshi", v: pct(k.exterior_lula), d: delta(S.kalshi_ext, 0) }]) +
+      { nome: "Polymarket", v: pct(pm.exterior_lula), d: delta(S.poly_ext, 0) }, { nome: "Kalshi", v: pct(k.exterior_lula), d: delta(S.kalshi_ext, 0) },
+      ...(pe?.disponivel && pe.prob_lula != null ? [{ nome: "Nosso modelo", v: pe.prob_lula, modelo: true }] : [])]) +
     card("Próximo fechamento", prox ? `<div class="mk-grande">${hhmm(prox.min)}</div><div class="mk-prox">${esc(nomeOnda(prox, 4))}</div>
       <div class="mk-linha"><span>${fmtMi(prox.eleitorado)} eleitores</span><b>em ${Math.max(0, Math.round(prox.min - agora))} min</b></div>` : `<div class="mk-prox">Todas as urnas do exterior já fecharam.</div>`,
       "horário de Brasília");
@@ -1388,6 +1407,8 @@ function initUI() {
       if (sl.tagName === "TR") $("mapa").scrollIntoView({ behavior: "smooth", block: "center" });
       return;
     }
+    const ro = ev.target.closest("[data-rolar]");
+    if (ro) { $(ro.dataset.rolar).scrollIntoView({ behavior: "smooth", block: "start" }); return; }
     const ex = ev.target.closest("[data-exp]");
     if (ex) { expandido[ex.dataset.exp] = !expandido[ex.dataset.exp]; if (EST) render(EST); }
   });

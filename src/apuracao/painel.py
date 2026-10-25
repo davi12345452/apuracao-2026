@@ -392,24 +392,15 @@ def placar_exterior(ctx: Ctx, agora: datetime | None = None) -> dict:
 GRUPOS_1T = [(0, 40, "Flávio forte", "f"), (40, 50, "Flávio leve", "f"), (50, 60, "Lula leve", "l"), (60, 101, "Lula forte", "l")]
 
 
-def crescimento_exterior(ctx: Ctx, n_boot: int = 300) -> dict | None:
-    """Por que cada um cresceu desde o 1º turno, nas seções que existem nos dois turnos.
+def _decompor(L2, F2, C2, A2, B2, L1, F1, C1, A1, B1, lugar: np.ndarray, iso: dict, n_boot: int = 300) -> dict:
+    """Por que cada um cresceu desde o 1º turno, unidade a unidade (seção no exterior, município no Brasil).
 
-    Decomposição ecológica: em cada seção, votos ganhos por apto = a·(3ª via do 1º turno por apto) +
-    b·(variação do comparecimento por apto), mínimos quadrados ponderados pelos aptos. a é a fatia da 3ª via
-    que foi para o candidato; b, a fatia de quem passou a votar (ou deixou de votar, se negativo). Estimativa
-    pelo padrão entre seções, não o voto de cada eleitor. Faixa: bootstrap das seções (p10–p90).
-    Também agrupa as seções pela inclinação no 1º turno (onde a abstenção caiu: em lugar pró ou anti Lula?)
-    e por país."""
-    bu1 = _bu_1t(ctx.db)
-    k = lambda r: (r["mun"], r["zona"], r["secao"])  # noqa: E731
-    pares = [(r, bu1[k(r)]) for r in ctx.bu_rows if k(r) in bu1 and bu1[k(r)]["aptos"] and r["aptos"]]
-    if len(pares) < 20:
-        return None
-    X = np.array([[r["lula"], r["flavio"], r["comparecimento"], r["aptos"], r["brancos"] + r["nulos"],
-                   s["lula"], s["flavio"], s["comparecimento"], s["aptos"], s["brancos"] + s["nulos"]]
-                  for r, s in pares], float)
-    L2, F2, C2, A2, B2, L1, F1, C1, A1, B1 = X.T
+    Decomposição ecológica: votos ganhos por apto = a·(3ª via do 1º turno por apto) + b·(variação do
+    comparecimento por apto), mínimos quadrados ponderados pelos aptos. a é a fatia da 3ª via que foi para o
+    candidato; b, a fatia de quem passou a votar (ou deixou de votar, se negativo). Estimativa pelo padrão
+    entre unidades, não o voto de cada eleitor. Faixa: bootstrap das unidades (p10–p90).
+    Também agrupa as unidades pela inclinação no 1º turno (a abstenção caiu em lugar pró ou anti Lula?)
+    e por lugar (país ou UF)."""
     O1, dL, dF, dC = C1 - L1 - F1 - B1, L2 - L1, F2 - F1, C2 - C1
     Z = np.c_[O1 / A1, dC / A1]
     w = np.sqrt(A1)
@@ -421,40 +412,70 @@ def crescimento_exterior(ctx: Ctx, n_boot: int = 300) -> dict | None:
             coef[nome] = c
         return coef
 
-    tudo = np.arange(len(pares))
-    coef = ajuste(tudo)
+    n = len(L2)
+    coef = ajuste(np.arange(n))
     rng = np.random.default_rng(7)
-    boot = [ajuste(rng.integers(0, len(pares), len(pares))) for _ in range(n_boot)]
+    boot = [ajuste(rng.integers(0, n, n)) for _ in range(n_boot)]
     O, D = O1.sum(), dC.sum()
     cand = {}
     for nome, d in (("lula", dL), ("flavio", dF)):
         a, b = coef[nome]
         ba = np.array([c[nome][0] for c in boot]); bb = np.array([c[nome][1] for c in boot])
-        cand[nome] = {"ganho": int(d.sum()), "da_3via": round(a * O), "do_comparecimento": round(b * D),
+        cand[nome] = {"ganho": int(round(d.sum())), "da_3via": int(round(a * O)), "do_comparecimento": int(round(b * D)),
                       "fatia_3via": _r(100 * a), "fatia_3via_faixa": [_r(100 * np.percentile(ba, 10)), _r(100 * np.percentile(ba, 90))],
                       "fatia_novos": _r(100 * b), "fatia_novos_faixa": [_r(100 * np.percentile(bb, 10)), _r(100 * np.percentile(bb, 90))]}
         cand[nome]["resto"] = cand[nome]["ganho"] - cand[nome]["da_3via"] - cand[nome]["do_comparecimento"]
 
     def resumo(m):
-        return {"secoes": int(m.sum()), "aptos": int(A2[m].sum()),
+        return {"unidades": int(m.sum()), "aptos": int(round(A2[m].sum())),
                 "abst_1t": _pct(A1[m].sum() - C1[m].sum(), A1[m].sum()), "abst": _pct(A2[m].sum() - C2[m].sum(), A2[m].sum()),
-                "d_comparecimento": int(dC[m].sum()), "outros_1t": int(O1[m].sum()),
-                "lula": int(dL[m].sum()), "flavio": int(dF[m].sum()),
+                "d_comparecimento": int(round(dC[m].sum())), "outros_1t": int(round(O1[m].sum())),
+                "lula": int(round(dL[m].sum())), "flavio": int(round(dF[m].sum())),
                 "lula_1t_pct": _pct(L1[m].sum(), L1[m].sum() + F1[m].sum()), "lula_pct": _pct(L2[m].sum(), L2[m].sum() + F2[m].sum())}
 
-    incl = 100 * L1 / np.maximum(L1 + F1, 1)
+    incl = 100 * L1 / np.maximum(L1 + F1, 1e-9)
     grupos = []
     for lo, hi, nome, lado in GRUPOS_1T:
         m = (incl >= lo) & (incl < hi)
         if m.any():
             grupos.append({"nome": nome, "lado": lado, "de": lo, "ate": min(hi, 100), **resumo(m)})
-    paises_sec = np.array([str(ctx.pais[ctx.idx[("zz", r["mun"])]]) if ("zz", r["mun"]) in ctx.idx else "?" for r, _ in pares])
-    paises = [{"pais": str(p), "iso3": ctx.iso3.get(p) or "", **resumo(paises_sec == p)} for p in set(paises_sec)]
-    paises = sorted((x for x in paises if x["secoes"] >= 3), key=lambda x: -abs(x["d_comparecimento"]))
-    return {"secoes": len(pares), "outros_1t": int(O), "d_comparecimento": int(D), "d_brancos_nulos": int((B2 - B1).sum()),
+    lugares = [{"lugar": str(x), "iso3": iso.get(str(x)) or "", **resumo(lugar == x)} for x in set(lugar.tolist())]
+    lugares = sorted((x for x in lugares if x["unidades"] >= 3), key=lambda x: -abs(x["d_comparecimento"]))
+    return {"unidades": n, "outros_1t": int(round(O)), "d_comparecimento": int(round(D)), "d_brancos_nulos": int(round((B2 - B1).sum())),
             "abst_1t": _pct(A1.sum() - C1.sum(), A1.sum()), "abst": _pct(A2.sum() - C2.sum(), A2.sum()),
-            "candidatos": cand, "grupos": grupos, "paises": paises}
+            "candidatos": cand, "grupos": grupos, "lugares": lugares}
 
+
+def crescimento_exterior(ctx: Ctx) -> dict | None:
+    """_decompor nas seções do exterior que existem nos dois turnos (BU contra BU)."""
+    bu1 = _bu_1t(ctx.db)
+    k = lambda r: (r["mun"], r["zona"], r["secao"])  # noqa: E731
+    pares = [(r, bu1[k(r)]) for r in ctx.bu_rows if k(r) in bu1 and bu1[k(r)]["aptos"] and r["aptos"]]
+    if len(pares) < 20:
+        return None
+    X = np.array([[r["lula"], r["flavio"], r["comparecimento"], r["aptos"], r["brancos"] + r["nulos"],
+                   s["lula"], s["flavio"], s["comparecimento"], s["aptos"], s["brancos"] + s["nulos"]]
+                  for r, s in pares], float)
+    lugar = np.array([str(ctx.pais[ctx.idx[("zz", r["mun"])]]) if ("zz", r["mun"]) in ctx.idx else "?" for r, _ in pares])
+    return {"unidade": "seções", "tipo_lugar": "país", **_decompor(*X.T, lugar, ctx.iso3)}
+
+
+def crescimento_brasil(ctx: Ctx, u: Unidades) -> dict | None:
+    """_decompor nos municípios com voto: o 1º turno de cada um na escala da fração apurada (eleitores
+    apurados / aptos do 1º turno), como na análise do Brasil. Em município parcial, parte da diferença
+    ainda é a ordem em que as seções entram."""
+    b1 = ctx.B["2026_1t"]
+    m = (u.vv > 0) & b1["tem"] & (b1["aptos"] > 0) & ~ctx.ext
+    if m.sum() < 30:
+        return None
+    g = u.est[m] / b1["aptos"][m]
+    L2, VV, C2, A2 = u.lula[m], u.vv[m], u.c[m], u.est[m]
+    B2 = np.maximum(C2 - VV, 0)
+    L1, F1 = g * b1["lula"][m], g * b1["direita"][m]
+    C1, A1 = g * b1["comparecimento"][m], g * b1["aptos"][m]
+    B1 = g * np.maximum(b1["comparecimento"][m] - b1["validos"][m], 0)
+    ufs = np.array([str(c[0]).upper() for c, ok in zip(ctx.chaves, m) if ok])
+    return {"unidade": "municípios", "tipo_lugar": "estado", **_decompor(L2, VV - L2, C2, A2, B2, L1, F1, C1, A1, B1, ufs, {})}
 
 def resultado_final(ctx: Ctx, m: np.ndarray) -> dict:
     """Resultado completo (não só as seções já apuradas) do 2º turno 2022 e do 1º turno 2026 no escopo:
@@ -467,7 +488,7 @@ def resultado_final(ctx: Ctx, m: np.ndarray) -> dict:
     return out
 
 
-def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int = 10) -> tuple[list[dict], list[dict]]:
+def recentes_exterior(ctx: Ctx, n: int = 100, n_lotes: int = 12, janela_min: int = 10) -> tuple[list[dict], list[dict]]:
     """Os boletins mais recentes do exterior (mais novo primeiro) e as chegadas em janelas de 10 min,
     cada um comparado com o 1º turno (mesma seção quando há, senão média da cidade) e com 2022 (cidade)."""
     bu1, s22 = _bu_1t(ctx.db), _secao_2022(ctx.db)
@@ -817,6 +838,10 @@ def estado(db: DB) -> dict:
                     brasil["analise"] = analise_brasil(ctx, u, p)
                 except Exception as e:  # noqa: BLE001 - o painel segue sem as análises
                     db.log("aviso", f"analise_brasil: {e!r}")
+                try:
+                    brasil["crescimento"] = crescimento_brasil(ctx, u)
+                except Exception as e:  # noqa: BLE001
+                    db.log("aviso", f"crescimento_brasil: {e!r}")
     brasil["hist"] = db.query("SELECT * FROM proj_hist WHERE escopo='br' ORDER BY ts")
     serie = db.query("SELECT ts_coleta, hg, secoes_apur, secoes_tot, lula, validos FROM snap "
                      "WHERE abr='br' AND secoes_apur>0 ORDER BY ts_coleta")

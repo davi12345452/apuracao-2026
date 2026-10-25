@@ -28,56 +28,67 @@
   <main>
     <!-- ============ BRASIL e EXTERIOR (mesma estrutura) ============ -->
     <section class="aba" id="aba-mapa" role="tabpanel">
-      <div class="palco">
-        <div class="mapa-card">
-          <div class="mapa-barra">
-            <div class="modos" id="modos"></div>
-            <div class="mapa-acoes" id="mapa-acoes"></div>
+      <!-- 1. veredito numa faixa: quem vence, por quanto, quanto falta e as referências -->
+      <div class="hero" id="hero"></div>
+
+      <div class="corpo">
+        <div class="principal">
+          <!-- 2. onde: o mapa -->
+          <div class="mapa-card">
+            <div class="mapa-barra">
+              <div class="modos" id="modos"></div>
+              <div class="mapa-acoes" id="mapa-acoes"></div>
+            </div>
+            <div class="mapa-area">
+              <div class="mapa" id="mapa"><div class="carregando">carregando mapa…</div></div>
+              <div class="selecao" id="selecao" hidden></div>
+            </div>
+            <div class="mapa-pe">
+              <div class="legenda-mapa" id="legenda-mapa"></div>
+              <div class="mapa-nota" id="mapa-nota"></div>
+            </div>
           </div>
-          <div class="mapa" id="mapa"><div class="carregando">carregando mapa…</div></div>
-          <div class="mapa-pe">
-            <div class="legenda-mapa" id="legenda-mapa"></div>
-            <div class="mapa-nota" id="mapa-nota"></div>
-          </div>
+
+          <!-- 3. por quê: de onde vem o crescimento, abstenção e 3ª via -->
+          <div id="porque" class="porque-area"></div>
+
+          <!-- 4. o que falta e a noite -->
+          <section class="faixa-baixo">
+            <div class="painel">
+              <header><h2 id="cascata-titulo">O que falta</h2><p id="cascata-sub"></p></header>
+              <div id="cascata"></div>
+            </div>
+            <div class="painel">
+              <header><h2>A noite</h2><p id="noite-sub"></p></header>
+              <div id="noite" class="grafico"></div>
+            </div>
+          </section>
+
+          <!-- 5. lugar a lugar -->
+          <section class="painel">
+            <header><h2 id="tabela-titulo">Estados</h2><p id="tabela-sub"></p></header>
+            <div class="tabela-wrap"><table id="tabela" class="tabela"></table></div>
+            <div id="tabela-mais"></div>
+          </section>
+
+          <!-- tudo o que entrou, completo (o resumo fica na lateral) -->
+          <section class="painel" id="feed-painel">
+            <header><h2 id="feed-titulo">Tudo o que entrou</h2><p id="feed-sub"></p></header>
+            <div id="feed"></div>
+          </section>
+
+          <details class="painel metodo" id="metodo">
+            <summary><h2>Como a projeção funciona</h2><span>e como ela se saiu em 2022</span></summary>
+            <div id="metodo-corpo"></div>
+          </details>
         </div>
+
+        <!-- lateral fixa: quem vence e o que acabou de entrar -->
         <aside class="lateral">
-          <div class="veredito" id="veredito"></div>
-          <div class="bloco-lat" id="contado"></div>
           <div class="bloco-lat" id="chances"></div>
-          <div class="bloco-lat selecao" id="selecao"></div>
+          <div class="bloco-lat aovivo" id="aovivo"></div>
         </aside>
       </div>
-
-      <section class="faixa-baixo">
-        <div class="painel">
-          <header><h2 id="cascata-titulo">Do contado à projeção</h2><p id="cascata-sub"></p></header>
-          <div id="cascata"></div>
-        </div>
-        <div class="painel">
-          <header><h2>A noite</h2><p id="noite-sub"></p></header>
-          <div id="noite" class="grafico"></div>
-        </div>
-      </section>
-
-      <!-- feed do que acabou de entrar: Brasil (agente B) e Exterior (agente A) -->
-      <section class="painel" id="feed-painel">
-        <header><h2 id="feed-titulo">O que acabou de entrar</h2><p id="feed-sub"></p></header>
-        <div id="feed"></div>
-      </section>
-
-      <!-- análises só do Brasil: origem dos votos, abstenção, 3ª via (agente B) -->
-      <div id="br-analise" class="br-analise"></div>
-
-      <section class="painel">
-        <header><h2 id="tabela-titulo">Estados</h2><p id="tabela-sub"></p></header>
-        <div class="tabela-wrap"><table id="tabela" class="tabela"></table></div>
-        <div id="tabela-mais"></div>
-      </section>
-
-      <details class="painel metodo" id="metodo">
-        <summary><h2>Como a projeção funciona</h2><span>e como ela se saiu em 2022</span></summary>
-        <div id="metodo-corpo"></div>
-      </details>
     </section>
 
     <!-- ============ MERCADOS ============ -->
