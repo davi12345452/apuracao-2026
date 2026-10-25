@@ -460,8 +460,10 @@ function cascata(c) {
       <span class="v">${fmtDelta(d, 2, true)}</span>`;
   }
   h += `<span class="r forte">Projeção</span>${barraCheia(c.fim)}<span class="v forte">${liderTxt(c.fim)}</span>`;
-  const ticks = [lo, 50, hi].filter((t, i, a) => a.indexOf(t) === i);
-  h += `<span></span><div class="eixo">${ticks.map((t) => `<span style="left:${X(t)}%">${t === 50 ? "empate" : liderTxt(t, 0)}</span>`).join("")}</div><span></span></div>`;
+  // nas pontas o rótulo encosta na borda; perto do empate (< 30% da largura) ele sai para não encavalar
+  const ticks = [lo, 50, hi].filter((t, i, a) => a.indexOf(t) === i && (t === 50 || Math.abs(X(t) - X(50)) >= 30));
+  const ancora = (t) => (t === lo ? "translateX(0)" : t === hi ? "translateX(-100%)" : "translateX(-50%)");
+  h += `<span></span><div class="eixo">${ticks.map((t) => `<span style="left:${X(t)}%;transform:${ancora(t)}">${t === 50 ? "empate" : liderTxt(t, 0)}</span>`).join("")}</div><span></span></div>`;
   return h;
 }
 function frasePorque(c) {
@@ -719,7 +721,7 @@ function brChip(rot, pp, quem, titulo = "") {
 // diferença a favor de Lula (> 0) → "Flávio +0,4"
 function brChipLado(rot, d, titulo = "") {
   if (d == null) return "";
-  return `<span class="br-chip" data-tip="${esc(titulo)}">${rot} ${fmtDelta(d, 1, true)}</span>`;
+  return `<span class="br-chip" data-tip="${esc(titulo)}">${rot} ${Math.abs(d) < 0.05 ? "igual" : fmtDelta(d, 1, true)}</span>`;
 }
 function brVazio(titulo, texto) {
   return `<section class="painel"><header><h2>${titulo}</h2></header><div class="vazio">${texto}</div></section>`;
@@ -1027,7 +1029,7 @@ function renderBrasil(est) {
   $("cascata-sub").textContent = ok ? "do contado à projeção, região por região" : "";
   $("cascata").innerHTML = ok ? cascata(cas) + `<p class="cascata-nota">Cada linha soma ao contado os votos que ainda faltam de uma região, com o resultado esperado ali.</p>` : `<div class="vazio">Aparece com 5% do eleitorado apurado, depois das 17h.</div>`;
   const hist = (b.hist || []).filter((h) => h.modelo === MODELO);
-  $("noite-sub").textContent = hist.length ? `${hist.length} atualizações do TSE · eixo: L = Lula à frente, F = Flávio à frente` : "";
+  $("noite-sub").textContent = hist.length ? `${hist.length} ${hist.length === 1 ? "atualização" : "atualizações"} do TSE · eixo: L = Lula à frente, F = Flávio à frente` : "";
   grafico($("noite"), {
     aria: "Projeção e contado ao longo da apuração", vazio: "Começa com a primeira totalização do TSE, às 17h. Cada atualização vira um ponto: o contado e a projeção com a faixa provável.",
     xFmt: (v) => fmtP(v, 0) + " apurado", xMin: 0, refs: [{ y: 50, label: "empate" }], yFmt: ladoEixo, tipFmt: (v) => liderTxt(v),
@@ -1038,15 +1040,18 @@ function renderBrasil(est) {
   });
   // tabela
   $("tabela-titulo").textContent = "Estados";
+  const g = ok ? (p.por_uf || []).slice() : [];
   if (ok) {
-    const g = (p.por_uf || []).slice();
     $("tabela-sub").textContent = "ordenados pelo peso no resultado · clique num estado para vê-lo no mapa";
-    $("tabela").innerHTML = cabTabela("Estado") + `<tbody>${g.map((x) => linhaTabela(x.grupo, x.nome, x.grupo === "zz" ? "" : x.grupo.toUpperCase(), x.apurado_pct, x.lula_contado_pct, x.lula_final_pct, x.saldo_esperado, maxSaldo(g))).join("")}</tbody>`;
+    // no celular cada estado ocupa duas linhas: mostra os 10 que mais pesam e o resto sob demanda
+    const curta = matchMedia("(max-width: 760px)").matches && !expandido.ufs && g.length > 10;
+    $("tabela").innerHTML = cabTabela("Estado") + `<tbody>${(curta ? g.slice(0, 10) : g).map((x) => linhaTabela(x.grupo, x.nome, x.grupo === "zz" ? "" : x.grupo.toUpperCase(), x.apurado_pct, x.lula_contado_pct, x.lula_final_pct, x.saldo_esperado, maxSaldo(g))).join("")}</tbody>`;
   } else {
     $("tabela-sub").textContent = "";
     $("tabela").innerHTML = `<tbody><tr><td class="vazio">Aparece com a projeção, depois das 17h.</td></tr></tbody>`;
   }
-  $("tabela-mais").innerHTML = "";
+  $("tabela-mais").innerHTML = ok && g.length > 10 && matchMedia("(max-width: 760px)").matches
+    ? `<button class="mais" data-exp="ufs">${expandido.ufs ? "Mostrar só os 10 que mais pesam" : `Mostrar os ${g.length} estados`}</button>` : "";
   renderFeedBrasil(est);
   renderAnaliseBrasil(est);
   renderMetodo(p, "brasil", est);
@@ -1063,8 +1068,8 @@ function linhaTabela(chave, nome, sub, ap, contado, proj, saldo, max) {
   const atual = aba === "exterior" ? sel.exterior : sel.brasil;
   return `<tr data-sel="${esc(chave)}" class="${atual === chave ? "on" : ""}"><td class="nome"><b>${esc(nome)}</b>${sub ? `<span>${esc(sub)}</span>` : ""}</td>
     <td><span class="ap">${fmtP(ap, 0)}<i><b style="width:${ap || 0}%"></b></i></span></td>
-    <td class="${cls(contado)}">${liderTxt(contado)}</td><td class="${cls(proj)}">${liderTxt(proj)}</td>
-    <td><span class="saldo"><span>${saldo == null ? "—" : saldoTxt(saldo)}</span><span class="div"><i style="${bar}"></i></span></span></td></tr>`;
+    <td class="${cls(contado)}" data-k="Contado">${liderTxt(contado)}</td><td class="${cls(proj)}" data-k="Projeção">${liderTxt(proj)}</td>
+    <td data-k="Saldo do que falta"><span class="saldo"><span>${saldo == null ? "—" : saldoTxt(saldo)}</span><span class="div"><i style="${bar}"></i></span></span></td></tr>`;
 }
 
 function renderExterior(est) {
