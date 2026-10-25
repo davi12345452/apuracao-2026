@@ -253,7 +253,7 @@ def por_uf(u: Unidades, chaves: list, bases: dict, db: DB) -> list[dict]:
             "apurado_pct": _pct(s.get("secoes_apur", 0), s.get("secoes_tot", 0)) if s else None,
             "lula_pct_oficial": _pct(s.get("lula", 0), s.get("validos", 0)) if s else None,
             "lula_pct": cmp_["lula_pct"], "abstencao_pct": cmp_["abstencao_pct"],
-            "lula_1t_pct": cmp_["2026_1t"]["lula_pct"], "lula_2022_pct": cmp_["2022_2t"]["lula_2v_pct"],
+            "lula_1t_pct": cmp_["2026_1t"]["lula_2v_pct"], "lula_2022_pct": cmp_["2022_2t"]["lula_2v_pct"],
             "abstencao_1t_pct": cmp_["2026_1t"]["abstencao_pct"], "abstencao_2022_pct": cmp_["2022_2t"]["abstencao_pct"],
             "eleitorado_apur_pct": _pct(float(u.est[sel].sum()), float(u.te[sel].sum())),
         })

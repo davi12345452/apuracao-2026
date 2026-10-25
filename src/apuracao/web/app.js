@@ -76,7 +76,7 @@ function projCard(el, p, titulo, sub, extra = "") {
       <div class="int" style="left:${x(p.p10)}%;width:${x(p.p90) - x(p.p10)}%"></div>
       <div class="med" style="left:calc(${x(p.lula_pct)}% - 1px)"></div>
     </div>
-    <div class="escala"><span>${lo}%</span><span>50%</span><span>${hi}%</span></div>
+    <div class="escala"><span>${lo}%</span><span class="e50" style="left:${x(50)}%">50%</span><span>${hi}%</span></div>
     <div class="linhas">
       <span>Faixa de 80% para Lula</span><span>${fmtP(p.p10)} a ${fmtP(p.p90)}</span>
       <span>Chance de Lula vencer</span><span>${fmtP(p.prob_lula, 0)}</span>
@@ -179,7 +179,7 @@ function ufs(est) {
       <td>${fmtP(u.lula_1t_pct, 1)}</td><td class="${sinal(u.lula_pct - u.lula_1t_pct)}">${u.lula_pct == null ? "—" : fmtPP(u.lula_pct - u.lula_1t_pct)}</td>
       <td>${fmtP(u.lula_2022_pct, 1)}</td><td class="${sinal(u.lula_pct - u.lula_2022_pct)}">${u.lula_pct == null ? "—" : fmtPP(u.lula_pct - u.lula_2022_pct)}</td>
       <td>${fmtP(u.abstencao_pct, 1)}</td><td>${fmtP(u.abstencao_1t_pct, 1)}</td><td>${fmtP(u.abstencao_2022_pct, 1)}</td></tr>`).join("") +
-    `<tr><td colspan="11" class="muted" style="text-align:left">* 1º turno: Lula entre todos os válidos, nas mesmas urnas.</td></tr>`;
+    `<tr><td colspan="11" class="muted" style="text-align:left">* 1º turno: fatia de Lula entre Lula e Flávio, nas mesmas urnas (sem os outros candidatos).</td></tr>`;
 }
 
 function render(est) {

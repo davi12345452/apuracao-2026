@@ -5,7 +5,7 @@ temporário e o painel (painel.estado) calcula tudo como faria hoje à noite. No
 base "2026_1t" recebe o 1º turno de 2022, para que a projeção por transferência seja testada no
 papel que terá hoje.
 
-Uso: python scripts/replay_2022.py [--servir PORTA]
+Uso: python scripts/replay_2022.py [--servir PORTA] [--parar-em 0.3]
 Critérios: no fim os totais do painel batem exatamente com 2022; erro da projeção ≤ 1,5 pp com 30%
 e ≤ 0,7 pp com 60%; nenhum erro registrado pelo coletor.
 """
@@ -82,6 +82,8 @@ def escrever(raiz: Path, uf: str, nome: str, doc: dict) -> None:
 
 def main():
     servir = int(sys.argv[sys.argv.index("--servir") + 1]) if "--servir" in sys.argv else None
+    parar = float(sys.argv[sys.argv.index("--parar-em") + 1]) if "--parar-em" in sys.argv else None
+    passos = [f for f in PASSOS if parar is None or f <= parar]
     zonas = ler_2t()
     chaves = sorted(zonas)
     tot_mun = defaultdict(lambda: defaultdict(int))
@@ -118,7 +120,7 @@ def main():
     tot_el = sum(v["aptos"] for v in zonas.values())
     hist = []
     t0 = time.monotonic()
-    for i, frac in enumerate(PASSOS):
+    for i, frac in enumerate(passos):
         acum = 0
         for j in ordem:
             if acum >= frac * tot_el and frac < 1:
@@ -166,6 +168,11 @@ def main():
         hist.append(linha)
         print(json.dumps(linha, ensure_ascii=False))
 
+    if parar is not None:
+        from apuracao.server import Estado, handler
+
+        print(f"parado em {parar:.0%}; painel do ensaio em http://127.0.0.1:{servir or 8001}", flush=True)
+        ThreadingHTTPServer(("127.0.0.1", servir or 8001), handler(Estado(db))).serve_forever()
     fim = estado(db)
     n = fim["nacional"]
     erros = db.query("SELECT * FROM evento WHERE nivel='erro'")

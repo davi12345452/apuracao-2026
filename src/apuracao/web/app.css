@@ -56,7 +56,8 @@ main { padding: 0 24px 24px; display: grid; gap: 16px; max-width: 1280px; margin
 .proj .faixa .cinquenta { position: absolute; top: 2px; bottom: 2px; width: 1px; background: var(--ref); }
 .proj .faixa .int { position: absolute; top: 8px; height: 10px; border-radius: 4px; background: var(--lula); opacity: .35; }
 .proj .faixa .med { position: absolute; top: 3px; width: 3px; height: 20px; border-radius: 2px; background: var(--text); }
-.proj .escala { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.proj .escala .e50 { position: absolute; transform: translateX(-50%); }
+.proj .escala { position: relative; display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .proj .linhas { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin-top: 10px; font-size: 13px; }
 .proj .linhas span:nth-child(even) { text-align: right; font-variant-numeric: tabular-nums; }
 .indisp { color: var(--muted); padding: 12px 0; }
