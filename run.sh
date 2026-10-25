@@ -1,16 +1,23 @@
 #!/bin/zsh
-# Liga/desliga o coletor e o painel local. Uso: ./run.sh [start|stop|status]
+# Liga/desliga o vigia, que sobe e supervisiona coletor e painel. Uso: ./run.sh [start|stop|status]
 cd "${0:A:h}"
+parar() {
+  for p in vigia coletor server; do
+    [ -f data/$p.pid ] && kill $(cat data/$p.pid) 2>/dev/null; rm -f data/$p.pid
+  done
+  pkill -f "apuracao\.(vigia|coletor|server)" 2>/dev/null
+  sleep 1
+}
 case "${1:-start}" in
   start)
-    for p in coletor server; do [ -f data/$p.pid ] && kill $(cat data/$p.pid) 2>/dev/null; done
-    nohup nice -n 10 .venv/bin/python -m apuracao.coletor >> data/coletor.log 2>&1 & echo $! > data/coletor.pid
-    nohup nice .venv/bin/python -m apuracao.server >> data/server.log 2>&1 & echo $! > data/server.pid
+    parar
+    nohup nice -n 5 .venv/bin/python -m apuracao.vigia >> data/vigia.log 2>&1 & echo $! > data/vigia.pid
     echo "painel: http://127.0.0.1:8000" ;;
-  stop)
-    for p in coletor server; do [ -f data/$p.pid ] && kill $(cat data/$p.pid) 2>/dev/null && rm data/$p.pid; done ;;
+  stop) parar ;;
   status)
-    for p in coletor server; do
-      if [ -f data/$p.pid ] && kill -0 $(cat data/$p.pid) 2>/dev/null; then echo "$p: rodando ($(cat data/$p.pid))"; else echo "$p: parado"; fi
-    done ;;
+    for p in vigia coletor server; do
+      pid=$(pgrep -f "apuracao\.$p" | head -1)
+      [ -n "$pid" ] && echo "$p: rodando ($pid)" || echo "$p: parado"
+    done
+    sqlite3 data/apuracao.db "select chave, ts, substr(valor,1,120) from saude order by chave" ;;
 esac

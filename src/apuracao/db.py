@@ -62,6 +62,17 @@ CREATE TABLE IF NOT EXISTS municipio (       -- cadastro (cm.json) + país das c
     uf TEXT NOT NULL, mun TEXT NOT NULL, nome TEXT, ibge TEXT, pais TEXT, iso3 TEXT,
     PRIMARY KEY (uf, mun)
 );
+CREATE TABLE IF NOT EXISTS saude (          -- batimentos dos laços e estado do vigia
+    chave TEXT PRIMARY KEY, valor TEXT, ts TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mercado (         -- cotações de Polymarket e Kalshi ao longo do tempo
+    ts TEXT NOT NULL, fonte TEXT NOT NULL, dados TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS proj_hist (       -- projeções ao longo da noite (para o gráfico de convergência)
+    ts TEXT NOT NULL, escopo TEXT NOT NULL, apurado REAL, parcial REAL,
+    modelo TEXT NOT NULL, p50 REAL, p10 REAL, p90 REAL, prob REAL,
+    PRIMARY KEY (escopo, modelo, ts)
+);
 CREATE TABLE IF NOT EXISTS evento (
     ts TEXT NOT NULL, nivel TEXT NOT NULL, msg TEXT NOT NULL
 );
@@ -99,6 +110,11 @@ class DB:
     def one(self, sql: str, params=()) -> dict | None:
         rows = self.query(sql, params)
         return rows[0] if rows else None
+
+    def batida(self, chave: str, valor: str = "ok") -> None:
+        from datetime import datetime
+
+        self.execute("INSERT OR REPLACE INTO saude VALUES (?,?,?)", (chave, valor, datetime.now().isoformat(timespec="seconds")))
 
     def log(self, nivel: str, msg: str) -> None:
         from datetime import datetime
