@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
+
 from analise_urnas.httpclient import HttpClient, HttpError
 
 from . import tse
@@ -34,6 +36,14 @@ def ler_u(http: HttpClient, uf: str, mun: str | None = None) -> dict | None:
         raise
 
 
+def _ler_seguro(db: DB, http: HttpClient, uf: str, mun: str) -> dict | None:
+    try:
+        return ler_u(http, uf, mun)
+    except Exception as e:  # noqa: BLE001 - fica para o próximo ciclo
+        db.log("aviso", f"mun {uf}{mun}: {e}")
+        return None
+
+
 def ciclo_topo(db: DB, http: HttpClient) -> dict:
     """br e zz. Devolve o parse do br (para decidir se vale ler as UFs)."""
     out = {}
@@ -45,7 +55,7 @@ def ciclo_topo(db: DB, http: HttpClient) -> dict:
     return out
 
 
-def ciclo_ufs(db: DB, http: HttpClient, ler_municipios: bool = True, max_mun: int = 400) -> dict:
+def ciclo_ufs(db: DB, http: HttpClient, ler_municipios: bool = True, max_mun: int = 800, workers: int = 4) -> dict:
     """UFs: snapshot, avanço por município (-ab) e votos dos municípios que avançaram."""
     mudaram: list[tuple[str, str]] = []
     for uf in tse.UFS + ["zz"]:
@@ -70,13 +80,14 @@ def ciclo_ufs(db: DB, http: HttpClient, ler_municipios: bool = True, max_mun: in
     lidos = 0
     if ler_municipios:
         mudaram.sort()
-        for _, _, uf, mun in mudaram[:max_mun]:
-            p = ler_u(http, uf, mun)
-            if not p:
-                continue
-            db.execute(
-                f"INSERT OR REPLACE INTO mun (uf, mun, dg, hg, {', '.join(CAMPOS)}) VALUES (?,?,?,?,{','.join('?' * 11)})",
-                (uf, mun, p["dg"], p["hg"], *_valores(p)),
-            )
-            lidos += 1
+        fila = [(uf, mun) for _, _, uf, mun in mudaram[:max_mun]]
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            for (uf, mun), p in zip(fila, ex.map(lambda k: _ler_seguro(db, http, *k), fila)):
+                if not p:
+                    continue
+                db.execute(
+                    f"INSERT OR REPLACE INTO mun (uf, mun, dg, hg, {', '.join(CAMPOS)}) VALUES (?,?,?,?,{','.join('?' * 11)})",
+                    (uf, mun, p["dg"], p["hg"], *_valores(p)),
+                )
+                lidos += 1
     return {"municipios_avancaram": len(mudaram), "municipios_lidos": lidos}

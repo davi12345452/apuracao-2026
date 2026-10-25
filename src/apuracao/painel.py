@@ -51,10 +51,12 @@ def unidades_atuais(db: DB, bases: dict, fonte_base: str, ext_bu: dict | None = 
     for i, k in enumerate(chaves):
         m, a, bb = mun.get(k), ab.get(k), b.get(k)
         arr["te"][i] = (a or {}).get("eleitorado") or b1[k]["aptos"]
-        if m and m["secoes_apur"]:
+        e_bu = ext_bu.get(k[1]) if k[0] == "zz" else None
+        # exterior: BU e totalização oficial convivem depois das 17h; vale a que cobre mais eleitorado
+        if m and m["secoes_apur"] and (not e_bu or m["eleitorado_apur"] >= e_bu["est"]):
             arr["est"][i], arr["c"][i] = m["eleitorado_apur"], m["comparecimento"]
             arr["vv"][i], arr["lula"][i] = m["validos"], m["lula"]
-        elif k[0] == "zz" and k[1] in ext_bu:
+        elif e_bu:
             e = ext_bu[k[1]]
             arr["est"][i], arr["c"][i] = e["est"], e["c"]
             arr["vv"][i], arr["lula"][i] = e["lula"] + e["flavio"], e["lula"]
