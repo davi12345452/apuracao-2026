@@ -303,9 +303,11 @@ def _refs_bu(ctx: Ctx, r: dict, bu1: dict, s22: dict | None = None) -> dict:
     i = ctx.idx.get(("zz", r["mun"]))
     out: dict = {"cidade": "", "pais": "", "lula_1t": None, "abst_1t": None, "ref_1t": None,
                  "lula_2022": None, "abst_2022": None, "ref_2022": None,
-                 # votos de cada um na referência (seção, ou média da cidade na escala dos aptos desta seção)
+                 # votos de cada um na referência: a própria seção ou, se ela não existia, a média da cidade com o
+                 # mesmo número de votantes desta seção (seção nova costuma ter abstenção bem diferente da cidade;
+                 # escalar por aptos jogaria essa diferença no saldo dos candidatos)
                  "v_1t": None, "v_2022": None}
-    esc = lambda b, i: r["aptos"] / b["aptos"][i]  # noqa: E731
+    esc = lambda b, i: r["comparecimento"] / b["comparecimento"][i] if b["comparecimento"][i] > 0 else 0.0  # noqa: E731
     s = (s22 or {}).get((r["mun"], r["zona"], r["secao"]))
     if s and (s["lula"] + s["bolsonaro"]) > 0 and s["aptos"]:
         out["lula_2022"] = 100 * s["lula"] / (s["lula"] + s["bolsonaro"])
@@ -460,12 +462,15 @@ def crescimento_exterior(ctx: Ctx) -> dict | None:
     return {"unidade": "seções", "tipo_lugar": "país", **_decompor(*X.T, lugar, ctx.iso3)}
 
 
+MIN_FRAC_MUN = 0.9
+
+
 def crescimento_brasil(ctx: Ctx, u: Unidades) -> dict | None:
-    """_decompor nos municípios com voto: o 1º turno de cada um na escala da fração apurada (eleitores
-    apurados / aptos do 1º turno), como na análise do Brasil. Em município parcial, parte da diferença
-    ainda é a ordem em que as seções entram."""
+    """_decompor nos municípios com 90% ou mais do eleitorado apurado: o 1º turno de cada um na escala da
+    fração apurada (eleitores apurados / aptos do 1º turno), como na análise do Brasil. Município parcial fica
+    de fora porque, nele, a diferença ainda mede a ordem em que as seções entram (centro antes da periferia)."""
     b1 = ctx.B["2026_1t"]
-    m = (u.vv > 0) & b1["tem"] & (b1["aptos"] > 0) & ~ctx.ext
+    m = (u.vv > 0) & b1["tem"] & (b1["aptos"] > 0) & ~ctx.ext & (u.est >= MIN_FRAC_MUN * u.te)
     if m.sum() < 30:
         return None
     g = u.est[m] / b1["aptos"][m]
@@ -475,7 +480,7 @@ def crescimento_brasil(ctx: Ctx, u: Unidades) -> dict | None:
     C1, A1 = g * b1["comparecimento"][m], g * b1["aptos"][m]
     B1 = g * np.maximum(b1["comparecimento"][m] - b1["validos"][m], 0)
     ufs = np.array([str(c[0]).upper() for c, ok in zip(ctx.chaves, m) if ok])
-    return {"unidade": "municípios", "tipo_lugar": "estado", **_decompor(L2, VV - L2, C2, A2, B2, L1, F1, C1, A1, B1, ufs, {})}
+    return {"unidade": "municípios", "tipo_lugar": "estado", "min_frac": MIN_FRAC_MUN, "eleitorado_pct": _pct(u.est[m].sum(), u.te[~ctx.ext].sum()), **_decompor(L2, VV - L2, C2, A2, B2, L1, F1, C1, A1, B1, ufs, {})}
 
 def resultado_final(ctx: Ctx, m: np.ndarray) -> dict:
     """Resultado completo (não só as seções já apuradas) do 2º turno 2022 e do 1º turno 2026 no escopo:

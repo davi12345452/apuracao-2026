@@ -571,8 +571,8 @@ function renderFeedExterior(est) {
         <small>${fmtN(r.lula)} × ${fmtN(r.flavio)} · ${fmtN(r.brancos)} br. · ${fmtN(r.nulos)} nulos</small>`}</span>
       <span class="fx-abst"><small>abstenção</small><b>${fmtP(r.abstencao_pct, 0)}</b><small>1º t. ${fmtP(r.abstencao_1t_pct, 0)}${cid1 ? "*" : ""}</small></span>
       <span class="fx-chips">
-        ${chipVotos(`votos × 1º turno${cid1 ? " · média da cidade" : ""}`, r.v_1t, r, cid1, `Votos nesta seção agora × no 1º turno (${cid1 ? "seção sem boletim no 1º turno: média da cidade na escala desta seção" : "mesma seção"}). Lula entre os dois: ${fmtP(pl)} agora × ${fmtP(r.lula_1t_pct)}. Abstenção: ${fmtP(r.abstencao_pct)} × ${fmtP(r.abstencao_1t_pct)}.`)}
-        ${chipVotos(`votos × 2022${cid22 ? " · média da cidade" : ""}`, r.v_2022, r, cid22, `Lula × Bolsonaro no 2º turno de 2022 (${cid22 ? "seção não existia em 2022: média da cidade na escala desta seção" : "mesma seção"}): Lula ${fmtP(r.lula_2022_pct)} dos dois. Abstenção em 2022: ${fmtP(r.abstencao_2022_pct)}.`)}
+        ${chipVotos(`votos × 1º turno${cid1 ? " · média da cidade" : ""}`, r.v_1t, r, cid1, `Votos nesta seção agora × no 1º turno (${cid1 ? "seção sem boletim no 1º turno: média da cidade com o mesmo número de votantes" : "mesma seção"}). Lula entre os dois: ${fmtP(pl)} agora × ${fmtP(r.lula_1t_pct)}. Abstenção: ${fmtP(r.abstencao_pct)} × ${fmtP(r.abstencao_1t_pct)}.`)}
+        ${chipVotos(`votos × 2022${cid22 ? " · média da cidade" : ""}`, r.v_2022, r, cid22, `Lula × Bolsonaro no 2º turno de 2022 (${cid22 ? "seção não existia em 2022: média da cidade com o mesmo número de votantes" : "mesma seção"}): Lula ${fmtP(r.lula_2022_pct)} dos dois. Abstenção em 2022: ${fmtP(r.abstencao_2022_pct)}.`)}
       </span></div>`;
   }).join("");
   const maisBU = rec.length > N_BU ? `<button class="mais" data-exp="fx-bu">${expandido["fx-bu"] ? "Ver só os 10 mais recentes" : `Ver mais (${rec.length} mais recentes)`}</button>` : "";
@@ -642,7 +642,7 @@ function cartaoCrescimento(c, pl) {
   }).join("");
   return `<div class="xp-card cr">
     <div class="rot">Por que cada um cresceu desde o 1º turno</div>
-    <div class="xp-sub">${c.unidade === "seções" ? `${fmtN(c.unidades)} seções que existem nos dois turnos` : `${fmtN(c.unidades)} municípios com voto, contra o 1º turno nas mesmas urnas`} · abstenção ${fmtP(c.abst_1t, 1)} → <b>${fmtP(c.abst, 1)}</b> · ${sinalC(D)} votantes · a 3ª via tinha ${fmtC(c.outros_1t)} votos</div>
+    <div class="xp-sub">${c.unidade === "seções" ? `${fmtN(c.unidades)} seções que existem nos dois turnos` : `${fmtN(c.unidades)} municípios com ${fmtP(100 * c.min_frac, 0)} ou mais apurado (${fmtP(c.eleitorado_pct, 0)} do eleitorado), contra o 1º turno nas mesmas urnas`} · abstenção ${fmtP(c.abst_1t, 1)} → <b>${fmtP(c.abst, 1)}</b> · ${sinalC(D)} votantes · a 3ª via tinha ${fmtC(c.outros_1t)} votos</div>
     ${v22 && v22.secoes ? `<div class="xp-sub">Contra o 2º turno de 2022, nas ${fmtN(v22.secoes)} seções que já existiam: Lula <b>${sinalC(v22.lula - v22.lula_antes)}</b>, Flávio <b>${sinalC(v22.flavio - v22.flavio_antes)}</b> em relação a Bolsonaro, comparecimento <b>${sinalC(v22.comparecimento - v22.comparecimento_antes)}</b>.</div>` : ""}
     <div class="cr-grade">
       <div>
@@ -842,7 +842,8 @@ function brAnalise(est) {
     return;
   }
   const min = est.min_apurado ?? 5, cedo = !(a.total.apurado_pct >= min);
-  const cr = cedo ? "" : cartaoCrescimento(est.brasil.crescimento);
+  const cr = cedo ? "" : cartaoCrescimento(est.brasil.crescimento)
+    || `<section class="painel"><header><h2>Por que cada um cresce</h2></header><div class="vazio">Aparece quando houver 30 municípios com 90% ou mais apurado: antes disso a conta mede mais a ordem de apuração do que o voto.</div></section>`;
   el.innerHTML = (cr || "") + brOrigem(a) + `<details class="painel br-det" ${expandido["br-det"] ? "open" : ""}><summary><h2>Região por região: abstenção e 3ª via</h2><span>contabilidade nas mesmas urnas</span></summary>
     <div class="br-dupla">${brAbstencao(a, cedo, min)}${brTerceira(a, cedo, min)}</div></details>`;
   el.querySelector(".br-det").addEventListener("toggle", (ev) => { expandido["br-det"] = ev.target.open; });
