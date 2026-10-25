@@ -55,25 +55,25 @@
           <!-- 4. o que falta e a noite -->
           <section class="faixa-baixo">
             <div class="painel">
-              <header><h2 id="cascata-titulo">O que falta</h2><p id="cascata-sub"></p></header>
+              <header><h2><span id="cascata-titulo">O que falta</span> <span class="ajuda" tabindex="0" data-tip="Parte do contado e soma, grupo a grupo, os votos que ainda faltam com o resultado esperado em cada lugar. Mostra quais lugares ainda podem mudar o placar.">?</span></h2><p id="cascata-sub"></p></header>
               <div id="cascata"></div>
             </div>
             <div class="painel">
-              <header><h2>A noite</h2><p id="noite-sub"></p></header>
+              <header><h2>A noite <span class="ajuda" tabindex="0" data-tip="Contado e projeção a cada atualização. A faixa sombreada é a faixa provável da projeção.">?</span></h2><p id="noite-sub"></p></header>
               <div id="noite" class="grafico"></div>
             </div>
           </section>
 
           <!-- 5. lugar a lugar -->
           <section class="painel">
-            <header><h2 id="tabela-titulo">Estados</h2><p id="tabela-sub"></p></header>
+            <header><h2><span id="tabela-titulo">Estados</span></h2><p id="tabela-sub"></p></header>
             <div class="tabela-wrap"><table id="tabela" class="tabela"></table></div>
             <div id="tabela-mais"></div>
           </section>
 
           <!-- tudo o que entrou, completo (o resumo fica na lateral) -->
           <section class="painel" id="feed-painel">
-            <header><h2 id="feed-titulo">Tudo o que entrou</h2><p id="feed-sub"></p></header>
+            <header><h2><span id="feed-titulo">Tudo o que entrou</span></h2><p id="feed-sub"></p></header>
             <div id="feed"></div>
           </section>
 
@@ -98,14 +98,14 @@
       <section class="painel">
         <header><h2>O dia nos mercados</h2><p id="mk-dia-sub"></p></header>
         <div id="mk-linha" class="linha-tempo"></div>
-        <p class="nota-leitura">As linhas verticais marcam o fechamento das urnas no exterior (17h locais). As faixas numeradas marcam os momentos em que a chance de vitória andou rápido. Os gráficos de chance estão do ponto de vista do favorito de agora; o fundo diz quem está à frente de cada lado do empate.</p>
+        <p class="nota-leitura">As linhas verticais marcam o fechamento das urnas no exterior (17h no horário local). As faixas numeradas marcam os momentos em que a chance de vitória andou rápido. Os gráficos de chance são desenhados a partir do favorito do momento; a cor de fundo mostra quem está à frente de cada lado da linha de empate.</p>
       </section>
 
       <section class="painel">
         <header><h2>Cada fechamento e o que o mercado fez depois</h2><p>de 15 min antes a 90 min depois do fechamento</p></header>
         <div class="tabela-wrap"><table id="mk-ondas" class="tabela ondas"></table></div>
         <div id="mk-ondas-mais"></div>
-        <p class="nota-leitura">Como ler: se um candidato vai melhor que no 1º turno nas cidades que fecharam e, logo depois, a chance e a diferença esperada andam a favor dele, o mercado provavelmente está reagindo ao exterior. Coincidência no tempo não prova causa.</p>
+        <p class="nota-leitura">Como ler: se um candidato vai melhor que no 1º turno nas cidades que fecharam e, logo depois, a chance e a diferença esperada andam a favor dele, o mercado provavelmente está reagindo ao exterior. Coincidência no tempo não prova causa e efeito.</p>
       </section>
 
       <section class="painel">
@@ -116,11 +116,11 @@
       <details class="painel metodo" id="mk-detalhes">
         <summary><h2>Retrato do mercado agora</h2><span>escada da Kalshi, margens e comparecimento</span></summary>
         <div class="dupla" style="margin-top:14px">
-          <div><div class="sub-h">Kalshi: chance de Lula ter pelo menos x% dos válidos (abaixo de 50%, Flávio vence)</div><div id="mk-escada" class="grafico" style="height:220px"></div></div>
+          <div><div class="sub-h">Kalshi: chance de Lula passar de x% dos votos válidos (abaixo de 50%, Flávio vence) <span class="ajuda" tabindex="0" data-tip="A Kalshi organiza as apostas como uma escada de limiares do percentual de Lula. O lado de Flávio é o complemento: 100% menos o valor.">?</span></div><div id="mk-escada" class="grafico" style="height:220px"></div></div>
           <div><div id="mk-margem"></div></div>
         </div>
         <div id="mk-comp" style="margin-top:14px"></div>
-        <p class="aviso" style="margin-top:14px">Cotações das APIs públicas da Polymarket e da Kalshi (preço médio entre compra e venda; o histórico vem das APIs de série de preços). O DNS da rede local bloqueia esses domínios; o coletor resolve os nomes por DNS-over-HTTPS.</p>
+        <p class="aviso" style="margin-top:14px">Cotações das APIs públicas da Polymarket e da Kalshi: preço médio entre compra e venda, com o histórico das APIs de série de preços. A rede local bloqueia esses domínios no DNS; o coletor resolve os nomes por DNS-over-HTTPS.</p>
       </details>
     </section>
 
@@ -136,7 +136,7 @@
       </div>
     </section>
   </main>
-  <footer>Dados: resultados.tse.jus.br e dados abertos do TSE · malhas do IBGE. Projeções são estimativas estatísticas e podem errar.</footer>
+  <footer>Dados: resultados.tse.jus.br e dados abertos do TSE · malhas do IBGE. Candidatos na ordem do número na urna (13 e 22). O placar é sempre dito pelo nome de quem lidera. Projeções são estimativas estatísticas e podem errar.</footer>
   <div id="tooltip" class="tooltip" hidden></div>
   <script src="app.js"></script>
 </body>

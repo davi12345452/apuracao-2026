@@ -89,11 +89,19 @@ def _votos(v: float) -> str:
     return f"{v / 1e6:.2f} mi".replace(".", ",") if v >= 1e6 else f"{v / 1e3:.0f} mil"
 
 
+def _lider(pl: float | None, d: int = 1) -> str:
+    """Placar pelo nome de quem lidera (pl: % de Lula entre os dois)."""
+    if pl is None:
+        return "—"
+    return f"Lula {_pct(pl, d)}" if pl >= 50 else f"Flávio {_pct(100 - pl, d)}"
+
+
 def _resumo(p: dict, escopo: str) -> str:
     lado = "Lula" if p["lula_pct"] >= 50 else "Flávio"
+    fav, q = ("Lula", p["prob_lula"]) if p["prob_lula"] >= 50 else ("Flávio", 100 - p["prob_lula"])
     return (f"{escopo}: Lula {_pct(p['lula_pct'])} × Flávio {_pct(100 - p['lula_pct'])} "
-            f"(faixa {_pct(p['p10'])}–{_pct(p['p90'])}), chance de Lula {_pct(p['prob_lula'], 0)}, "
-            f"{lado} por {_votos(p['margem_votos'])} votos")
+            f"(faixa provável: {_lider(p['p10'])} a {_lider(p['p90'])}). Chance de vitória de {fav}: {_pct(q, 0)}. "
+            f"{lado} à frente por {_votos(p['margem_votos'])} votos.")
 
 
 def _chances(db: DB, p: dict, pref: str, escopo: str, silencioso: bool = False) -> None:
@@ -139,7 +147,7 @@ def verificar(db: DB, est: dict) -> None:
             if cruzados and not primeira:
                 m = cruzados[-1]
                 cont = 100 * n["lula"] / n["validos"] if n.get("validos") else None
-                _avisar(db, f"br_ap_{m}", f"{m}% apurado. Contado: Lula {_pct(cont)}.\n{_resumo(pb, 'Projeção')}")
+                _avisar(db, f"br_ap_{m}", f"{m}% apurado. Contado: {_lider(cont)}.\n{_resumo(pb, 'Projeção')}")
             for m in cruzados[:-1] if not primeira else cruzados:
                 db.execute("INSERT OR IGNORE INTO alerta VALUES (?,?,?)", (f"br_ap_{m}", datetime.now().isoformat(timespec="seconds"), "(silencioso)"))
         if n.get("validos"):
@@ -148,7 +156,7 @@ def verificar(db: DB, est: dict) -> None:
             if antes and antes != lado:
                 _avisar(db, f"br_contado_{lado}_{datetime.now():%H%M}",
                         f"Virada no contado: {lado} passou à frente com {_pct(n.get('apurado_pct'), 1)} apurado "
-                        f"(Lula {_pct(100 * n['lula'] / n['validos'], 2)}).")
+                        f"({_lider(100 * n['lula'] / n['validos'], 2)}).")
             _guardar(db, "br_contado_lado", lado)
     # mercados: chance média de Lula andando forte em 30 min
     s = ((est.get("movimentos") or {}).get("series") or {})
@@ -170,8 +178,8 @@ def verificar(db: DB, est: dict) -> None:
             d = 100 * (sum(b) - sum(a)) / 2
             if abs(d) >= MOV_MERCADO_PP:
                 lado = "Lula" if d > 0 else "Flávio"
-                _avisar(db, f"mk_{int(agora // 30)}", f"Mercado andou {abs(d):.1f} pp para {lado} em 30 min: "
-                        f"chance de Lula {100 * sum(a) / 2:.1f}% → {100 * sum(b) / 2:.1f}% (média Polymarket e Kalshi).".replace(".", ","))
+                _avisar(db, f"mk_{int(agora // 30)}", f"Mercado andou {_pct(abs(d)).rstrip('%')} pp para {lado} em 30 min. "
+                        f"Chance de vitória: {_lider(100 * sum(a) / 2)} → {_lider(100 * sum(b) / 2)} (média Polymarket e Kalshi).")
     # coleta
     try:
         vg = json.loads(((est.get("saude") or {}).get("vigia") or {}).get("valor") or "{}")

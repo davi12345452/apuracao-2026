@@ -191,7 +191,7 @@ main { max-width: 1440px; margin: 0 auto; padding: 20px 24px 32px; }
 .dupla { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
 
 /* cascata */
-.cascata { display: grid; grid-template-columns: 128px 1fr 76px; gap: 6px 12px; align-items: center; font-size: 12.5px; }
+.cascata { display: grid; grid-template-columns: 128px 1fr 104px; gap: 6px 12px; align-items: center; font-size: 12.5px; }
 .cascata .r { color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cascata .r.forte { color: var(--text); font-weight: 650; }
 .cascata .pista { position: relative; height: 22px; }
@@ -602,3 +602,11 @@ footer { text-align: center; color: var(--muted); font-size: 12px; padding: 0 16
 .cen-t td small { display: block; color: var(--muted); font-size: 11px; }
 .cen-t td.pct-l b { color: var(--lula); } .cen-t td.pct-f b { color: var(--flavio); }
 @media (max-width: 760px) { .cen-topo { grid-template-columns: 1fr; gap: 8px; } }
+/* dicas */
+.ajuda { display: inline-grid; place-items: center; width: 15px; height: 15px; margin-left: 5px; border-radius: 50%; border: 1px solid var(--border);
+  font: 600 9.5px/1 var(--mono); color: var(--muted); cursor: help; vertical-align: 2px; letter-spacing: 0; text-transform: none; }
+.ajuda:hover, .ajuda:focus { color: var(--text); border-color: var(--text-2); outline: none; }
+.tip { text-decoration: underline dotted; text-decoration-color: var(--ref); text-underline-offset: 3px; cursor: help; }
+.tip:focus { outline: none; text-decoration-color: var(--text); }
+.tooltip .tt-d { max-width: 280px; line-height: 1.45; color: var(--text); font-size: 12px; }
+.modos button.off { opacity: .45; cursor: default; }
