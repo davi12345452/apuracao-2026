@@ -78,16 +78,40 @@ def ciclo_ufs(db: DB, http: HttpClient, ler_municipios: bool = True, max_mun: in
                 # nunca lido vem primeiro; depois quem mais avançou desde a última leitura
                 mudaram.append((a["mun"] in antes, -(a["st"] - antes.get(a["mun"], 0)), uf, a["mun"]))
     lidos = 0
+    hist: list[tuple] = []
     if ler_municipios:
         mudaram.sort()
         fila = [(uf, mun) for _, _, uf, mun in mudaram[:max_mun]]
-        with ThreadPoolExecutor(max_workers=workers) as ex:
-            for (uf, mun), p in zip(fila, ex.map(lambda k: _ler_seguro(db, http, *k), fila)):
-                if not p:
-                    continue
-                db.execute(
-                    f"INSERT OR REPLACE INTO mun (uf, mun, dg, hg, {', '.join(CAMPOS)}) VALUES (?,?,?,?,{','.join('?' * 11)})",
-                    (uf, mun, p["dg"], p["hg"], *_valores(p)),
-                )
-                lidos += 1
+        try:
+            with ThreadPoolExecutor(max_workers=workers) as ex:
+                for (uf, mun), p in zip(fila, ex.map(lambda k: _ler_seguro(db, http, *k), fila)):
+                    if not p:
+                        continue
+                    db.execute(
+                        f"INSERT OR REPLACE INTO mun (uf, mun, dg, hg, {', '.join(CAMPOS)}) VALUES (?,?,?,?,{','.join('?' * 11)})",
+                        (uf, mun, p["dg"], p["hg"], *_valores(p)),
+                    )
+                    lidos += 1
+                    if p.get("st"):
+                        hist.append((agora(), uf, mun, p["dg"], p["hg"], *_valores(p)))
+        finally:
+            gravar_hist(db, hist)
     return {"municipios_avancaram": len(mudaram), "municipios_lidos": lidos}
+
+
+def gravar_hist(db: DB, linhas: list[tuple]) -> None:
+    """Histórico dos municípios lidos no ciclo, de uma vez: uma linha por nº de seções apuradas (a chave
+    ignora releituras iguais). Nunca derruba a coleta: o histórico é só para as análises do painel."""
+    if not linhas:
+        return
+    try:
+        db.executemany(
+            f"INSERT OR IGNORE INTO mun_hist (ts_coleta, uf, mun, dg, hg, {', '.join(CAMPOS)}) "
+            f"VALUES (?,?,?,?,?,{','.join('?' * 11)})",
+            linhas,
+        )
+    except Exception as e:  # noqa: BLE001
+        try:
+            db.log("aviso", f"mun_hist ({len(linhas)} linhas): {e!r}")
+        except Exception:  # noqa: BLE001 - banco travado: segue sem log
+            pass

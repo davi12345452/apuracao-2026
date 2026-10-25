@@ -277,6 +277,332 @@ def _paises(ctx: Ctx, u: Unidades) -> list[dict]:
     return out
 
 
+def _bu_1t(db: DB) -> dict[tuple, dict]:
+    """BUs do 1º turno das mesmas seções do exterior (scripts/baixar_bu_1t.py); vazio se a tabela não existe."""
+    try:
+        return {(r["mun"], r["zona"], r["secao"]): r for r in db.query("SELECT * FROM bu_1t")}
+    except Exception:  # noqa: BLE001 - tabela opcional
+        return {}
+
+
+def _r(x, d=1):
+    return None if x is None or not np.isfinite(x) else round(float(x), d)
+
+
+def _refs_bu(ctx: Ctx, r: dict, bu1: dict) -> dict:
+    """Referências de um BU do 2º turno: 1º turno (mesma seção ou média da cidade) e 2º turno 2022 (cidade)."""
+    i = ctx.idx.get(("zz", r["mun"]))
+    out: dict = {"cidade": "", "pais": "", "lula_1t": None, "abst_1t": None, "ref_1t": None,
+                 "lula_2022": None, "abst_2022": None}
+    if i is not None:
+        out["cidade"], out["pais"] = ctx.nome[i].title(), str(ctx.pais[i]) or "?"
+    s = bu1.get((r["mun"], r["zona"], r["secao"]))
+    if s and (s["lula"] + s["flavio"]) > 0 and s["aptos"]:
+        out["lula_1t"] = 100 * s["lula"] / (s["lula"] + s["flavio"])
+        out["abst_1t"] = 100 * (s["aptos"] - s["comparecimento"]) / s["aptos"]
+        out["ref_1t"] = "secao"
+    elif i is not None:
+        b = ctx.B["2026_1t"]
+        if b["tem"][i] and b["lula"][i] + b["direita"][i] > 0 and b["aptos"][i] > 0:
+            out["lula_1t"] = 100 * b["lula"][i] / (b["lula"][i] + b["direita"][i])
+            out["abst_1t"] = 100 * (b["aptos"][i] - b["comparecimento"][i]) / b["aptos"][i]
+            out["ref_1t"] = "cidade"
+    if i is not None:
+        b = ctx.B["2022_2t"]
+        if b["tem"][i] and b["lula"][i] + b["direita"][i] > 0 and b["aptos"][i] > 0:
+            out["lula_2022"] = 100 * b["lula"][i] / (b["lula"][i] + b["direita"][i])
+            out["abst_2022"] = 100 * (b["aptos"][i] - b["comparecimento"][i]) / b["aptos"][i]
+    return out
+
+
+def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int = 10) -> tuple[list[dict], list[dict]]:
+    """Os boletins mais recentes do exterior (mais novo primeiro) e as chegadas em janelas de 10 min,
+    cada um comparado com o 1º turno (mesma seção quando há, senão média da cidade) e com 2022 (cidade)."""
+    bu1 = _bu_1t(ctx.db)
+    linhas = []
+    for r in ctx.bu_rows:
+        ref = _refs_bu(ctx, r, bu1)
+        v2 = r["lula"] + r["flavio"]
+        lula = 100 * r["lula"] / v2 if v2 else None
+        abst = 100 * (r["aptos"] - r["comparecimento"]) / r["aptos"] if r["aptos"] else None
+        dif = lambda a, b: None if a is None or b is None else a - b  # noqa: E731
+        linhas.append({
+            "t": _quando(r), "mun": r["mun"], "zona": r["zona"], "secao": r["secao"],
+            "cidade": ref["cidade"], "pais": ref["pais"], "iso3": ctx.iso3.get(ref["pais"]) or "",
+            "aptos": r["aptos"], "comparecimento": r["comparecimento"], "lula": r["lula"], "flavio": r["flavio"],
+            "brancos": r["brancos"], "nulos": r["nulos"], "lula_pct": lula, "abstencao_pct": abst,
+            "ref_1t": ref["ref_1t"], "lula_1t_pct": ref["lula_1t"], "abstencao_1t_pct": ref["abst_1t"],
+            "d_lula_1t": dif(lula, ref["lula_1t"]), "d_abst_1t": dif(abst, ref["abst_1t"]),
+            "lula_2022_pct": ref["lula_2022"], "abstencao_2022_pct": ref["abst_2022"],
+            "d_lula_2022": dif(lula, ref["lula_2022"]), "d_abst_2022": dif(abst, ref["abst_2022"]),
+        })
+    # lotes: janelas de 10 min pela hora de recebimento no TSE
+    grupos: dict[str, list[dict]] = {}
+    for x in linhas:
+        t = x["t"]
+        m = int(t[14:16]) // janela_min * janela_min
+        grupos.setdefault(f"{t[:14]}{m:02d}", []).append(x)
+    lotes = []
+    for ini in sorted(grupos, reverse=True)[:n_lotes]:
+        g = grupos[ini]
+        L, F = sum(x["lula"] for x in g), sum(x["flavio"] for x in g)
+        A, C = sum(x["aptos"] for x in g), sum(x["comparecimento"] for x in g)
+        w1 = [(x["lula"] + x["flavio"], x["lula_1t_pct"]) for x in g if x["lula_1t_pct"] is not None]
+        w22 = [(x["lula"] + x["flavio"], x["lula_2022_pct"]) for x in g if x["lula_2022_pct"] is not None]
+        a1 = [(x["aptos"], x["abstencao_1t_pct"]) for x in g if x["abstencao_1t_pct"] is not None]
+        med = lambda ws: (sum(w * v for w, v in ws) / sum(w for w, _ in ws)) if ws and sum(w for w, _ in ws) else None  # noqa: E731
+        cont: dict[str, int] = defaultdict(int)
+        for x in g:
+            cont[x["pais"]] += 1
+        h0 = int(ini[11:13]) * 60 + int(ini[14:16]) + janela_min
+        lotes.append({
+            "de": ini, "ate": f"{ini[:11]}{h0 // 60 % 24:02d}:{h0 % 60:02d}", "boletins": len(g),
+            "paises": [[p, k] for p, k in sorted(cont.items(), key=lambda kv: -kv[1])],
+            "lula": L, "flavio": F, "lula_pct": _pct(L, L + F), "abstencao_pct": _pct(A - C, A),
+            "lula_1t_pct": _r(med(w1), 3), "abstencao_1t_pct": _r(med(a1), 3), "lula_2022_pct": _r(med(w22), 3),
+            "secao_1t": sum(1 for x in g if x["ref_1t"] == "secao"),
+        })
+    rec = []
+    for x in reversed(linhas[-n:]):
+        rec.append({k: (_r(v) if isinstance(v, float) else v) for k, v in x.items()})
+    return rec, lotes
+
+
+# ---------------- Brasil: o que acabou de entrar, origem dos votos, abstenção e 3ª via ----------------
+ORDEM_REGIOES = ["Norte", "Nordeste", "Centro-Oeste", "Sudeste", "Sul", "Exterior"]
+
+
+def _br_div(a, b, k=100.0, d=2):
+    a, b = float(a), float(b)
+    return round(k * a / b, d) if b else None
+
+
+def _br_dif(a, b):
+    return round(a - b, 2) if a is not None and b is not None else None
+
+
+# Só as linhas mais recentes (índice em ts_coleta; um lote tem no máximo ~5,6 mil municípios) e, para cada
+# uma, a leitura anterior do mesmo município pela chave primária. Nada varre a mun_hist inteira.
+_SQL_INCR = """
+WITH rec AS (
+  SELECT rowid rid, coalesce(dg, '') dgk, substr(coalesce(hg, ''), 1, 5) hm, ts_coleta FROM mun_hist
+  ORDER BY ts_coleta DESC LIMIT ?
+), lotes AS (
+  SELECT dgk, hm, max(ts_coleta) t FROM rec GROUP BY dgk, hm ORDER BY t DESC LIMIT ?
+)
+SELECT h.uf, h.mun, h.dg, h.hg, h.ts_coleta, h.secoes_tot, h.secoes_apur, h.eleitorado_apur, h.comparecimento,
+       h.validos, h.brancos, h.nulos, h.lula, h.flavio, lotes.t lote_t,
+       coalesce(p.secoes_apur, 0) p_sec, coalesce(p.eleitorado_apur, 0) p_est, coalesce(p.comparecimento, 0) p_c,
+       coalesce(p.brancos, 0) p_vb, coalesce(p.nulos, 0) p_vn, coalesce(p.lula, 0) p_l, coalesce(p.flavio, 0) p_f
+FROM rec JOIN lotes ON rec.dgk = lotes.dgk AND rec.hm = lotes.hm
+JOIN mun_hist h ON h.rowid = rec.rid
+LEFT JOIN mun_hist p ON p.uf = h.uf AND p.mun = h.mun AND p.secoes_apur = (
+  SELECT max(x.secoes_apur) FROM mun_hist x WHERE x.uf = h.uf AND x.mun = h.mun AND x.secoes_apur < h.secoes_apur)
+"""
+_LINHAS_RECENTES = 50_000
+_CACHE_INCR: dict = {"chave": None, "rows": []}
+
+
+def _linhas_incr(db: DB, n_lotes: int) -> list[dict]:
+    """Linhas cruas dos incrementos, refeitas só quando a mun_hist muda (o painel recalcula a cada 8 s)."""
+    sig = db.one("SELECT max(rowid) r, count(*) n FROM mun_hist") or {}
+    chave = (sig.get("r"), sig.get("n"), n_lotes)
+    if chave != _CACHE_INCR["chave"]:
+        _CACHE_INCR.update(chave=chave, rows=db.query(_SQL_INCR, (_LINHAS_RECENTES, n_lotes)) if sig.get("n") else [])
+    return _CACHE_INCR["rows"]
+
+
+def _incrementos(ctx: Ctx, n_lotes: int, alpha: dict | None = None) -> list[dict]:
+    """Urnas que acabaram de entrar: diferença entre leituras seguidas de cada município (mun_hist),
+    nos últimos lotes do TSE (mesma data e hora-minuto do arquivo). Comparadas com o MESMO município
+    inteiro no 1º turno e em 2022 (não existe dado por seção)."""
+    try:
+        rows = _linhas_incr(ctx.db, n_lotes)
+    except Exception as e:  # noqa: BLE001 - banco antigo sem mun_hist
+        ctx.db.log("aviso", f"incrementos: {e!r}")
+        return []
+    b1, b22 = ctx.B["2026_1t"], ctx.B["2022_2t"]
+    out = []
+    for r in rows:
+        i = ctx.idx.get((r["uf"], r["mun"]))
+        est, c = r["eleitorado_apur"] - r["p_est"], r["comparecimento"] - r["p_c"]
+        lu, fl = r["lula"] - r["p_l"], r["flavio"] - r["p_f"]
+        bn = r["brancos"] + r["nulos"] - r["p_vb"] - r["p_vn"]
+        if est <= 0 or lu + fl <= 0:
+            continue
+        e = {"uf": r["uf"].upper(), "mun": r["mun"], "nome": (ctx.nome[i].title() if i is not None else r["mun"]),
+             "regiao": tse.REGIAO.get(r["uf"], "?"), "hg": r["hg"] or "", "dg": r["dg"] or "", "lote": f"{r['dg'] or ''} {(r['hg'] or '')[:5]}",
+             "_t": r["lote_t"], "secoes": r["secoes_apur"] - r["p_sec"], "secoes_apur": r["secoes_apur"],
+             "secoes_tot": r["secoes_tot"], "completo": r["secoes_apur"] >= r["secoes_tot"], "primeira": r["p_sec"] == 0,
+             "eleitores": est, "comparecimento": c, "lula": lu, "flavio": fl, "brancos_nulos": bn,
+             "lula_pct": _br_div(lu, lu + fl), "abstencao_pct": _br_div(est - c, est), "bn_pct": _br_div(bn, c),
+             "_s1": None, "_ab1": None, "_sesp": None}
+        if i is not None and b1["tem"][i] and b1["aptos"][i] > 0:
+            L1, D1, V1 = b1["lula"][i], b1["direita"][i], b1["validos"][i]
+            e["t1"] = {"lula_pct": _br_div(L1, L1 + D1), "outros_pct": _br_div(b1["outros"][i], V1),
+                       "abstencao_pct": _br_div(b1["aptos"][i] - b1["comparecimento"][i], b1["aptos"][i])}
+            e["_s1"] = L1 / (L1 + D1) if L1 + D1 else None
+            e["_ab1"] = 1 - b1["comparecimento"][i] / b1["aptos"][i]
+            a = (alpha or {}).get(e["regiao"])
+            if a is not None and V1 > 0:  # base da projeção: Lula no 1º turno + α × outros
+                e["_sesp"] = min(1.0, (L1 + a / 100 * b1["outros"][i]) / V1)
+            e["dif_1t"] = {"lula_pp": _br_dif(e["lula_pct"], e["t1"]["lula_pct"]),
+                           "abstencao_pp": _br_dif(e["abstencao_pct"], e["t1"]["abstencao_pct"])}
+        if i is not None and b22["tem"][i] and b22["aptos"][i] > 0:
+            L, B = b22["lula"][i], b22["direita"][i]
+            e["t22"] = {"lula_pct": _br_div(L, L + B),
+                        "abstencao_pct": _br_div(b22["aptos"][i] - b22["comparecimento"][i], b22["aptos"][i])}
+            e["dif_2022"] = {"lula_pp": _br_dif(e["lula_pct"], e["t22"]["lula_pct"]),
+                             "abstencao_pp": _br_dif(e["abstencao_pct"], e["t22"]["abstencao_pct"])}
+        out.append(e)
+    return out
+
+
+def _lotes(incr: list[dict]) -> list[dict]:
+    """Lote = arquivos de município gerados pelo TSE no mesmo minuto (dg + hora:minuto do arquivo):
+    quanto entrou por região e Lula × o esperado. Separa o que veio de primeiras leituras (município
+    lido pela primeira vez: pode trazer várias atualizações do TSE de uma vez)."""
+    por: dict[str, dict] = {}
+    for e in incr:
+        lt = por.setdefault(e["lote"], {"lote": e["lote"], "hg": (e["hg"] or "")[:5], "_t": e["_t"], "regs": defaultdict(lambda: defaultdict(float))})
+        for chave in (e["regiao"], "Total"):
+            a = lt["regs"][chave]
+            if e["primeira"]:
+                a["municipios_1a"] += 1; a["validos_1a"] += e["lula"] + e["flavio"]
+            a["municipios"] += 1; a["secoes"] += e["secoes"]; a["eleitores"] += e["eleitores"]
+            a["comparecimento"] += e["comparecimento"]; a["lula"] += e["lula"]; a["validos"] += e["lula"] + e["flavio"]
+            if e["_s1"] is not None:
+                v = e["lula"] + e["flavio"]
+                a["v_base"] += v; a["l_base"] += v * e["_s1"]; a["l_base_obs"] += e["lula"]
+                a["e_base"] += e["eleitores"]; a["ab_base"] += e["eleitores"] * e["_ab1"]
+            if e["_sesp"] is not None:
+                v = e["lula"] + e["flavio"]
+                a["v_esp"] += v; a["l_esp"] += v * e["_sesp"]; a["l_esp_obs"] += e["lula"]
+    out = []
+    for lt in sorted(por.values(), key=lambda x: x["_t"], reverse=True):
+        regs = []
+        for nome, a in lt["regs"].items():
+            lula_pct = _br_div(a["lula"], a["validos"])
+            esp = _br_div(a["l_base"], a["v_base"])
+            regs.append({"regiao": nome, "municipios": int(a["municipios"]), "secoes": int(a["secoes"]),
+                         "municipios_1a_leitura": int(a["municipios_1a"]), "validos_1a_leitura": a["validos_1a"],
+                         "eleitores": a["eleitores"], "validos": a["validos"], "lula": a["lula"],
+                         "saldo": 2 * a["lula"] - a["validos"], "lula_pct": lula_pct,
+                         "lula_1t_pct": esp, "dif_1t_pp": _br_dif(_br_div(a["l_base_obs"], a["v_base"]), esp),
+                         "esperado_pct": _br_div(a["l_esp"], a["v_esp"]),
+                         "dif_pp": _br_dif(_br_div(a["l_esp_obs"], a["v_esp"]), _br_div(a["l_esp"], a["v_esp"])),
+                         "abstencao_pct": _br_div(a["eleitores"] - a["comparecimento"], a["eleitores"]),
+                         "abstencao_1t_pct": _br_div(a["ab_base"], a["e_base"])})
+        regs.sort(key=lambda x: (x["regiao"] == "Total", -x["validos"]))
+        out.append({"lote": lt["lote"], "hg": lt["hg"], "regioes": [x for x in regs if x["regiao"] != "Total"],
+                    "total": next(x for x in regs if x["regiao"] == "Total")})
+    return out
+
+
+def analise_brasil(ctx: Ctx, u: Unidades, p: dict, n_entradas: int = 40, n_lotes: int = 8) -> dict:
+    """De onde vêm os votos, abstenção e 3ª via, nas mesmas urnas (fração apurada de cada município
+    aplicada ao 1º turno de 2026 e ao 2º turno de 2022), por região e por UF.
+
+    Abstenção, efeito no saldo: contrafactual em que cada município contado comparece com a taxa do
+    1º turno e vota como está votando agora (fatia de Lula e taxa de válidos observadas). Efeito =
+    saldo observado − saldo contrafactual, medido na fatia: 2·(S − S')·W = Σ 2·(w − w')·(s − S'),
+    com w/w' os válidos observados/contrafactuais, s a fatia de Lula no município e S' a fatia
+    nacional contrafactual. Queda uniforme de comparecimento não muda nada; só pesa onde o município
+    vota diferente da média.
+
+    3ª via: contabilidade agregada (não é fluxo individual). Com g = eleitores apurados / aptos do
+    1º turno, ΔLula + ΔFlávio + Δ(brancos+nulos) + Δabstenção = g·O1 exatamente.
+    """
+    b1, b22 = ctx.B["2026_1t"], ctx.B["2022_2t"]
+    rep = u.vv > 0
+    ok1 = rep & b1["tem"] & (b1["aptos"] > 0)
+    ok22 = ok1 & b22["tem"] & (b22["aptos"] > 0)
+    A1 = np.where(b1["aptos"] > 0, b1["aptos"], 1)
+    g = np.where(ok1, u.est / A1, 0.0)
+    L, VV, C, EST = u.lula, u.vv, u.c, u.est
+    F = VV - L
+    BN, AB = np.maximum(C - VV, 0), np.maximum(EST - C, 0)
+    L1, D1, O1 = b1["lula"], b1["direita"], b1["outros"]
+    BN1 = np.maximum(b1["comparecimento"] - b1["validos"], 0)
+    AB1 = np.maximum(b1["aptos"] - b1["comparecimento"], 0)
+    AB22 = np.maximum(b22["aptos"] - b22["comparecimento"], 0)
+    # abstenção: comparecimento esperado com a taxa do 1º turno, votando como agora
+    c_esp = np.where(ok1, EST * b1["comparecimento"] / A1, C)
+    w = np.where(ok1, VV, 0.0)
+    w_cf = np.where(ok1 & (C > 0), VV * c_esp / np.where(C > 0, C, 1), 0.0)
+    s = np.where(rep, L / np.where(rep, VV, 1), 0.0)
+    S_cf = float((w_cf * s).sum() / w_cf.sum()) if w_cf.sum() else 0.0
+    ef = 2 * (w - w_cf) * (s - S_cf)
+    W_tot = float(VV.sum())
+    V1_tot = float(b1["validos"].sum())
+    tem1 = b1["tem"]
+    S1_br = _br_div((L1 * tem1).sum(), ((L1 + D1) * tem1).sum())
+
+    def met(m: np.ndarray) -> dict:
+        mr, m1, m22 = m & rep, m & ok1, m & ok22
+        te, est = float(u.te[m].sum()), float(EST[m].sum())
+        vv, lu = float(VV[mr].sum()), float(L[mr].sum())
+        o1 = float((g * O1)[m1].sum())
+        dl, df = float((L - g * L1)[m1].sum()), float((F - g * D1)[m1].sum())
+        dbn, dab = float((BN - g * BN1)[m1].sum()), float((AB - g * AB1)[m1].sum())
+        e = float(ef[m1].sum())
+        r = {
+            "eleitorado": te, "apurado_pct": _br_div(est, te), "municipios": int(mr.sum()),
+            "validos": vv, "lula": lu, "saldo": 2 * lu - vv,
+            "parcela_contado_pct": _br_div(vv, W_tot), "parcela_esperada_pct": _br_div(float(b1["validos"][m].sum()), V1_tot),
+            "lula_pct": _br_div(lu, vv),
+            "lula_1t_pct": _br_div((g * L1)[m1].sum(), (g * (L1 + D1))[m1].sum()),
+            "lula_2022_pct": _br_div((g * b22["lula"])[m22].sum(), (g * (b22["lula"] + b22["direita"]))[m22].sum()),
+            "lula_1t_final_pct": _br_div((L1 * tem1)[m].sum(), ((L1 + D1) * tem1)[m].sum()),
+            "abstencao_pct": _br_div(AB[mr].sum(), EST[mr].sum()),
+            "abstencao_1t_pct": _br_div((g * AB1)[m1].sum(), (g * b1["aptos"])[m1].sum()),
+            "abstencao_2022_pct": _br_div((g * AB22)[m22].sum(), (g * b22["aptos"])[m22].sum()),
+            "comparecimento_extra": float((C - c_esp)[m1].sum()),
+            "efeito_abstencao_votos": e, "efeito_abstencao_pp": _br_div(e, 2 * W_tot) if W_tot else None,
+            "outros_1t": o1,
+            "destino": {k: (_br_div(v, o1) if o1 > 0 else None) for k, v in
+                        (("lula", dl), ("flavio", df), ("brancos_nulos", dbn), ("abstencao", dab))},
+            "destino_votos": {"lula": dl, "flavio": df, "brancos_nulos": dbn, "abstencao": dab},
+            "lula_entre_os_dois_pct": _br_div(dl, dl + df) if dl + df > 0 and dl >= 0 and df >= 0 else None,
+        }
+        r["abstencao_dif_1t_pp"] = _br_dif(r["abstencao_pct"], r["abstencao_1t_pct"])
+        r["abstencao_dif_2022_pp"] = _br_dif(r["abstencao_pct"], r["abstencao_2022_pct"])
+        r["lula_dif_1t_pp"] = _br_dif(r["lula_pct"], r["lula_1t_pct"])
+        return r
+
+    alpha = p.get("alpha_regiao") or {}
+    if isinstance(alpha, list):
+        alpha = dict(zip(REGIOES, alpha))
+    regioes = []
+    for nome in ORDEM_REGIOES:
+        if nome not in REGIOES:
+            continue
+        mreg = ctx.regiao == REGIOES.index(nome)
+        if not mreg.any():
+            continue
+        r = {"regiao": nome, **met(mreg), "alpha_pct": round(float(alpha[nome]), 1) if alpha.get(nome) is not None else None}
+        ufs = []
+        for uf in dict.fromkeys(ctx.uf[mreg].tolist()):
+            if uf == "zz":
+                continue
+            ufs.append({"uf": uf.upper(), "nome": NOMES_UF.get(uf, uf), **met(ctx.uf == uf)})
+        r["ufs"] = sorted(ufs, key=lambda x: -x["eleitorado"])
+        regioes.append(r)
+    total = met(np.ones(len(ctx.chaves), dtype=bool))
+    S1_cont = total["lula_1t_pct"]
+    incr = _incrementos(ctx, n_lotes, alpha)
+    incr.sort(key=lambda e: (e["_t"], e["eleitores"]), reverse=True)
+    entradas = [{k: v for k, v in e.items() if not k.startswith("_")} for e in incr[:n_entradas]]
+    return {
+        "regioes": regioes, "total": total,
+        "geografia": {"lula_1t_contado_pct": S1_cont, "lula_1t_brasil_pct": S1_br, "puxado_pp": _br_dif(S1_cont, S1_br)},
+        "abstencao_efeito": {"votos": float(ef.sum()), "pp": _br_div(float(ef.sum()), 2 * W_tot) if W_tot else None,
+                             "comparecimento_extra": total["comparecimento_extra"]},
+        "entradas": entradas, "lotes": _lotes(incr),
+        "n_incrementos": len(incr),
+    }
+
+
 def _ensaio() -> dict | None:
     from pathlib import Path
 
@@ -328,6 +654,11 @@ def estado(db: DB) -> dict:
                                "abstencao_1t_pct": c["2026_1t"]["abstencao_pct"],
                                "abstencao_2022_pct": c["2022_2t"]["abstencao_pct"]})
             brasil["por_uf"] = por_uf
+            if apurando:
+                try:
+                    brasil["analise"] = analise_brasil(ctx, u, p)
+                except Exception as e:  # noqa: BLE001 - o painel segue sem as análises
+                    db.log("aviso", f"analise_brasil: {e!r}")
     brasil["hist"] = db.query("SELECT * FROM proj_hist WHERE escopo='br' ORDER BY ts")
     serie = db.query("SELECT ts_coleta, hg, secoes_apur, secoes_tot, lula, validos FROM snap "
                      "WHERE abr='br' AND secoes_apur>0 ORDER BY ts_coleta")
@@ -365,6 +696,11 @@ def estado(db: DB) -> dict:
     ext["hist"] = historico_exterior(ctx)
     ext["secoes"], ext["secoes_tot"] = len(ctx.bu_rows), sum(ctx.secoes_cidade.values())
     ext["ultimo_bu"] = _quando(ctx.bu_rows[-1]) if ctx.bu_rows else None
+    try:
+        ext["recentes"], ext["lotes"] = recentes_exterior(ctx)
+    except Exception as e:  # noqa: BLE001 - o painel segue sem o feed
+        db.log("aviso", f"recentes do exterior: {e!r}")
+        ext["recentes"], ext["lotes"] = [], []
     out["exterior"] = ext
     return out
 

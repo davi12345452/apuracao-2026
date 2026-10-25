@@ -27,6 +27,16 @@ CREATE TABLE IF NOT EXISTS mun (             -- último estado de cada municípi
     validos INTEGER, brancos INTEGER, nulos INTEGER, lula INTEGER, flavio INTEGER,
     PRIMARY KEY (uf, mun)
 );
+CREATE TABLE IF NOT EXISTS mun_hist (        -- cada leitura de município em que o nº de seções apuradas mudou
+    ts_coleta TEXT NOT NULL,                 -- a diferença entre leituras seguidas = urnas que acabaram de entrar
+    uf TEXT NOT NULL, mun TEXT NOT NULL,
+    dg TEXT, hg TEXT,
+    secoes_tot INTEGER, secoes_apur INTEGER,
+    eleitorado INTEGER, eleitorado_apur INTEGER, comparecimento INTEGER, abstencao INTEGER,
+    validos INTEGER, brancos INTEGER, nulos INTEGER, lula INTEGER, flavio INTEGER,
+    PRIMARY KEY (uf, mun, secoes_apur)
+);
+CREATE INDEX IF NOT EXISTS mun_hist_ts ON mun_hist (ts_coleta);
 CREATE TABLE IF NOT EXISTS mun_ab (          -- arquivo -ab: avanço por município (sem votos)
     uf TEXT NOT NULL, mun TEXT NOT NULL,
     secoes_tot INTEGER, secoes_apur INTEGER,

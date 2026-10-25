@@ -57,7 +57,7 @@ def baixar_secao(http: HttpClient, mun: str, zona: str, secao: str) -> dict | No
     h = escolher_hash(aux)
     if not h:
         return None
-    arq = next((a for a in h.get("arq") or [] if a.get("tp") == "bu"), None)
+    arq = next((a for a in h.get("arq") or [] if a.get("tp") in ("bu", "busa")), None)  # busa: seção com cédula
     if not arq:
         return None
     raw = http.get_bytes(f"{tse.secao_dir('zz', mun, zona, secao)}/{h['hash']}/{arq['nm']}")
