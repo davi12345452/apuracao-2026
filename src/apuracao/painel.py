@@ -389,6 +389,73 @@ def placar_exterior(ctx: Ctx, agora: datetime | None = None) -> dict:
     return out
 
 
+GRUPOS_1T = [(0, 40, "Flávio forte", "f"), (40, 50, "Flávio leve", "f"), (50, 60, "Lula leve", "l"), (60, 101, "Lula forte", "l")]
+
+
+def crescimento_exterior(ctx: Ctx, n_boot: int = 300) -> dict | None:
+    """Por que cada um cresceu desde o 1º turno, nas seções que existem nos dois turnos.
+
+    Decomposição ecológica: em cada seção, votos ganhos por apto = a·(3ª via do 1º turno por apto) +
+    b·(variação do comparecimento por apto), mínimos quadrados ponderados pelos aptos. a é a fatia da 3ª via
+    que foi para o candidato; b, a fatia de quem passou a votar (ou deixou de votar, se negativo). Estimativa
+    pelo padrão entre seções, não o voto de cada eleitor. Faixa: bootstrap das seções (p10–p90).
+    Também agrupa as seções pela inclinação no 1º turno (onde a abstenção caiu: em lugar pró ou anti Lula?)
+    e por país."""
+    bu1 = _bu_1t(ctx.db)
+    k = lambda r: (r["mun"], r["zona"], r["secao"])  # noqa: E731
+    pares = [(r, bu1[k(r)]) for r in ctx.bu_rows if k(r) in bu1 and bu1[k(r)]["aptos"] and r["aptos"]]
+    if len(pares) < 20:
+        return None
+    X = np.array([[r["lula"], r["flavio"], r["comparecimento"], r["aptos"], r["brancos"] + r["nulos"],
+                   s["lula"], s["flavio"], s["comparecimento"], s["aptos"], s["brancos"] + s["nulos"]]
+                  for r, s in pares], float)
+    L2, F2, C2, A2, B2, L1, F1, C1, A1, B1 = X.T
+    O1, dL, dF, dC = C1 - L1 - F1 - B1, L2 - L1, F2 - F1, C2 - C1
+    Z = np.c_[O1 / A1, dC / A1]
+    w = np.sqrt(A1)
+
+    def ajuste(idx):
+        coef = {}
+        for nome, d in (("lula", dL), ("flavio", dF)):
+            c, *_ = np.linalg.lstsq(Z[idx] * w[idx, None], (d[idx] / A1[idx]) * w[idx], rcond=None)
+            coef[nome] = c
+        return coef
+
+    tudo = np.arange(len(pares))
+    coef = ajuste(tudo)
+    rng = np.random.default_rng(7)
+    boot = [ajuste(rng.integers(0, len(pares), len(pares))) for _ in range(n_boot)]
+    O, D = O1.sum(), dC.sum()
+    cand = {}
+    for nome, d in (("lula", dL), ("flavio", dF)):
+        a, b = coef[nome]
+        ba = np.array([c[nome][0] for c in boot]); bb = np.array([c[nome][1] for c in boot])
+        cand[nome] = {"ganho": int(d.sum()), "da_3via": round(a * O), "do_comparecimento": round(b * D),
+                      "fatia_3via": _r(100 * a), "fatia_3via_faixa": [_r(100 * np.percentile(ba, 10)), _r(100 * np.percentile(ba, 90))],
+                      "fatia_novos": _r(100 * b), "fatia_novos_faixa": [_r(100 * np.percentile(bb, 10)), _r(100 * np.percentile(bb, 90))]}
+        cand[nome]["resto"] = cand[nome]["ganho"] - cand[nome]["da_3via"] - cand[nome]["do_comparecimento"]
+
+    def resumo(m):
+        return {"secoes": int(m.sum()), "aptos": int(A2[m].sum()),
+                "abst_1t": _pct(A1[m].sum() - C1[m].sum(), A1[m].sum()), "abst": _pct(A2[m].sum() - C2[m].sum(), A2[m].sum()),
+                "d_comparecimento": int(dC[m].sum()), "outros_1t": int(O1[m].sum()),
+                "lula": int(dL[m].sum()), "flavio": int(dF[m].sum()),
+                "lula_1t_pct": _pct(L1[m].sum(), L1[m].sum() + F1[m].sum()), "lula_pct": _pct(L2[m].sum(), L2[m].sum() + F2[m].sum())}
+
+    incl = 100 * L1 / np.maximum(L1 + F1, 1)
+    grupos = []
+    for lo, hi, nome, lado in GRUPOS_1T:
+        m = (incl >= lo) & (incl < hi)
+        if m.any():
+            grupos.append({"nome": nome, "lado": lado, "de": lo, "ate": min(hi, 100), **resumo(m)})
+    paises_sec = np.array([str(ctx.pais[ctx.idx[("zz", r["mun"])]]) if ("zz", r["mun"]) in ctx.idx else "?" for r, _ in pares])
+    paises = [{"pais": str(p), "iso3": ctx.iso3.get(p) or "", **resumo(paises_sec == p)} for p in set(paises_sec)]
+    paises = sorted((x for x in paises if x["secoes"] >= 3), key=lambda x: -abs(x["d_comparecimento"]))
+    return {"secoes": len(pares), "outros_1t": int(O), "d_comparecimento": int(D), "d_brancos_nulos": int((B2 - B1).sum()),
+            "abst_1t": _pct(A1.sum() - C1.sum(), A1.sum()), "abst": _pct(A2.sum() - C2.sum(), A2.sum()),
+            "candidatos": cand, "grupos": grupos, "paises": paises}
+
+
 def recentes_exterior(ctx: Ctx, n: int = 40, n_lotes: int = 12, janela_min: int = 10) -> tuple[list[dict], list[dict]]:
     """Os boletins mais recentes do exterior (mais novo primeiro) e as chegadas em janelas de 10 min,
     cada um comparado com o 1º turno (mesma seção quando há, senão média da cidade) e com 2022 (cidade)."""
@@ -779,6 +846,7 @@ def estado(db: DB) -> dict:
     try:
         ext["recentes"], ext["lotes"] = recentes_exterior(ctx)
         ext["placar"] = placar_exterior(ctx)
+        ext["crescimento"] = crescimento_exterior(ctx)
     except Exception as e:  # noqa: BLE001 - o painel segue sem o feed
         db.log("aviso", f"recentes do exterior: {e!r}")
         ext["recentes"], ext["lotes"] = [], []

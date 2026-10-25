@@ -491,7 +491,7 @@ function renderFeedExterior(est) {
     ${L.vs_1t && L.secao_1t ? `<span class="sep">·</span> <b>desde o 1º turno${L.secao_1t < L.boletins ? ` (${L.secao_1t} seções)` : ""}: Lula ${sinalN(L.vs_1t.lula - L.vs_1t.lula_antes)}, Flávio ${sinalN(L.vs_1t.flavio - L.vs_1t.flavio_antes)}</b> <span class="muted">(3ª via tinha ${fmtN(L.vs_1t.outros_antes)})</span>` : ""}
     <span class="sep">·</span> abstenção <b>${fmtP(L.abstencao_pct, 0)}</b> <span class="muted">(1º turno: ${fmtP(L.abstencao_1t_pct, 0)})</span>
     ${nNovos ? `<span class="fx-novos">${nNovos} ${nNovos === 1 ? "novo" : "novos"} desde a última atualização</span>` : ""}</div>` : "";
-  renderPlacarExterior(x.placar);
+  renderPlacarExterior(x.placar, x.crescimento);
   // ---------- boletins: os 10 mais recentes, o resto ao expandir (sem rolagem interna) ----------
   const N_BU = 10, N_LOTES = 6;
   const recVis = expandido["fx-bu"] ? rec : rec.slice(0, N_BU);
@@ -526,7 +526,7 @@ function renderFeedExterior(est) {
 }
 
 // placar do exterior em números brutos, no topo da aba (inserido antes do mapa; só aparece na aba Exterior)
-function renderPlacarExterior(pl) {
+function renderPlacarExterior(pl, cr) {
   let el = $("ext-placar");
   if (!el) {
     el = document.createElement("section");
@@ -564,42 +564,76 @@ function renderPlacarExterior(pl) {
       <div class="xp-l">${marca("l")}<span class="n">Lula</span><b>+${fmtN(uh.lula)}</b></div>
       <div class="xp-l">${marca("f")}<span class="n">Flávio</span><b>+${fmtN(uh.flavio)}</b></div>
       <div class="xp-sub">pela hora em que o TSE recebeu</div></div>
-    ${cartaoFluxo(pl.vs_1t)}`;
+    ${cartaoCrescimento(cr)}`;
 }
 
-// de onde vieram os votos que Lula e Flávio ganharam desde o 1º turno, nas mesmas seções.
-// Balanço exato: ΔLula + ΔFlávio = 3ª via do 1º turno + Δcomparecimento − Δ(brancos+nulos)
-function cartaoFluxo(v) {
-  if (!v || !v.secoes || v.outros_antes == null) return "";
-  const dL = v.lula - v.lula_antes, dF = v.flavio - v.flavio_antes, tot = dL + dF;
-  const dC = v.comparecimento - v.comparecimento_antes, dBN = v.brancos_nulos - v.brancos_nulos_antes;
-  const fontes = [
-    { rot: "votos da 3ª via no 1º turno", v: v.outros_antes, cor: "var(--a4)" },
-    { rot: dC >= 0 ? "gente que não tinha votado" : "gente que votou no 1º turno e não voltou", v: dC, cor: "var(--a3)" },
-    { rot: dBN <= 0 ? "brancos e nulos que escolheram um lado" : "a mais em branco e nulo", v: -dBN, cor: "var(--a2)" },
-  ];
-  const destinos = [{ rot: "Lula", v: dL, cor: "var(--lula)" }, { rot: "Flávio", v: dF, cor: "var(--flavio)" }];
-  const escala = Math.max(1, ...[fontes, destinos].map((xs) => xs.filter((x) => x.v > 0).reduce((a, x) => a + x.v, 0)));
-  const barra = (xs) => `<div class="fl-barra">${xs.filter((x) => x.v > 0).map((x) =>
-    `<i style="width:${(100 * x.v) / escala}%;background:${x.cor}" title="${esc(x.rot)}: ${fmtN(x.v)}"></i>`).join("")}</div>`;
-  const legenda = (xs) => `<div class="fl-leg">${xs.filter((x) => x.v !== 0).map((x) =>
-    `<span><i style="background:${x.cor}"></i>${esc(x.rot)} <b>${x.v > 0 ? "+" : "−"}${fmtN(Math.abs(x.v))}</b></span>`).join("")}</div>`;
-  const fatiaAntes = (100 * v.lula_antes) / Math.max(1, v.lula_antes + v.flavio_antes);
-  const fatiaAgora = (100 * v.lula) / Math.max(1, v.lula + v.flavio);
-  const fatiaNovos = tot > 0 ? (100 * dL) / tot : null;
-  const quem = fatiaAgora >= fatiaAntes ? "Lula" : "Flávio";
-  const frase = fatiaNovos == null ? "" : `Lula ficou com <b>${fmtP(fatiaNovos)}</b> dos votos novos e Flávio com <b>${fmtP(100 - fatiaNovos)}</b>.
-    No 1º turno, Lula tinha ${fmtP(fatiaAntes)} dos votos dos dois; como pegou ${fatiaNovos >= fatiaAntes ? "mais" : "menos"} que isso do que entrou,
-    a fatia dele ${fatiaAgora >= fatiaAntes ? "subiu" : "caiu"} para <b>${fmtP(fatiaAgora)}</b>: em proporção, quem ganhou terreno foi <b>${quem}</b>.`;
-  return `<div class="xp-card fx">
-    <div class="rot">Os dois cresceram desde o 1º turno · de onde vieram os votos novos</div>
-    <div class="xp-sub">nas ${fmtN(v.secoes)} seções já apuradas que existem nos dois turnos</div>
-    <div class="fl-grade">
-      <div class="fl-t">De onde vieram</div><div>${barra(fontes)}${legenda(fontes)}</div>
-      <div class="fl-t">Para quem foram</div><div>${barra(destinos)}${legenda(destinos)}</div>
+// por que cada um cresceu desde o 1º turno: 3ª via × quem passou a votar, e onde a abstenção caiu
+function cartaoCrescimento(c) {
+  if (!c || !c.candidatos) return "";
+  const L = c.candidatos.lula, F = c.candidatos.flavio, D = c.d_comparecimento;
+  const voltou = D >= 0 ? "de quem não tinha votado no 1º turno" : "de quem votou no 1º turno e não voltou";
+  const escala = Math.max(1, ...[L, F].map((x) => Math.max(0, x.da_3via) + Math.max(0, x.do_comparecimento)));
+  const linha = (nome, lado, x) => `<div class="cr-l">
+      <span class="cr-n">${marca(lado)}${nome}</span><b class="cr-g">${sinalN(x.ganho)}</b>
+      <div class="cr-barra">
+        <i class="s ${lado}" style="width:${(100 * Math.max(0, x.da_3via)) / escala}%" title="da 3ª via: ~${fmtN(x.da_3via)}"></i>
+        <i class="r ${lado}" style="width:${(100 * Math.max(0, x.do_comparecimento)) / escala}%" title="${voltou}: ~${fmtN(x.do_comparecimento)}"></i>
+      </div>
+      <span class="cr-p"><b>~${fmtN(x.da_3via)}</b> da 3ª via · <b>~${fmtN(x.do_comparecimento)}</b> ${D >= 0 ? "de quem voltou a votar" : "de quem deixou de votar"}</span>
+    </div>`;
+  const pp = (a, b) => (a == null || b == null ? null : a - b);
+  const saldoAbst = L.do_comparecimento - F.do_comparecimento, saldo3 = L.da_3via - F.da_3via;
+  const quem = (v) => (v >= 0 ? "Lula" : "Flávio");
+  const fonte = (x) => (x.do_comparecimento > x.da_3via ? "com quem não tinha votado no 1º turno" : "com a 3ª via");
+  const frase = `<b>Lula</b> cresceu sobretudo ${fonte(L)} e <b>Flávio</b>, ${fonte(F)}.
+    Dos eleitores que ${D >= 0 ? "passaram a votar" : "deixaram de votar"}, cerca de <b>${fmtP(L.fatia_novos, 0)}</b> ${D >= 0 ? "foram para" : "eram de"} Lula;
+    da 3ª via, cerca de <b>${fmtP(F.fatia_3via, 0)}</b> foi para Flávio e <b>${fmtP(L.fatia_3via, 0)}</b> para Lula.
+    No saldo, a mudança na abstenção rendeu <b>${quem(saldoAbst)} +${fmtN(Math.abs(saldoAbst))}</b> votos de vantagem e a 3ª via rendeu <b>${quem(saldo3)} +${fmtN(Math.abs(saldo3))}</b>.`;
+  // onde a abstenção caiu
+  const gs = c.grupos || [];
+  const vals = gs.flatMap((g) => [g.abst_1t, g.abst]).filter((v) => v != null);
+  const lo = Math.floor(Math.min(...vals) - 1), hi = Math.ceil(Math.max(...vals) + 1), xp = (v) => (100 * (v - lo)) / (hi - lo);
+  const halter = (a, b) => `<div class="cr-halter"><span class="ln" style="left:${Math.min(xp(a), xp(b))}%;width:${Math.abs(xp(a) - xp(b))}%"></span>
+      <i class="d0" style="left:${xp(a)}%" title="1º turno ${fmtP(a)}"></i><i class="d1" style="left:${xp(b)}%" title="agora ${fmtP(b)}"></i></div>`;
+  const linhasG = gs.map((g) => `<tr><td><b>${marca(g.lado)}${g.nome}</b><small>Lula tinha ${g.de === 0 ? `menos de ${g.ate}%` : g.ate >= 100 ? `${g.de}% ou mais` : `${g.de}–${g.ate}%`} no 1º turno · ${fmtN(g.secoes)} seções</small></td>
+      <td class="cr-ab">${halter(g.abst_1t, g.abst)}<small>${fmtP(g.abst_1t, 1)} → <b>${fmtP(g.abst, 1)}</b></small></td>
+      <td><b>${fmtPPs(pp(g.abst, g.abst_1t))} pp</b><small>abstenção</small></td>
+      <td><b>${sinalN(g.d_comparecimento)}</b><small>votantes</small></td>
+      <td><b>${sinalN(g.lula)}</b><small>Lula</small></td><td><b>${sinalN(g.flavio)}</b><small>Flávio</small></td></tr>`).join("");
+  const gL = gs.filter((g) => g.lado === "l").slice(-1)[0], gF = gs.filter((g) => g.lado === "f")[0];
+  const fraseG = gL && gF ? (() => {
+    const qL = -pp(gL.abst, gL.abst_1t), qF = -pp(gF.abst, gF.abst_1t);
+    const lado = qL > qF + 0.5 ? "Lula" : qF > qL + 0.5 ? "Flávio" : null;
+    return `A abstenção ${qL >= 0 ? "caiu" : "subiu"} <b>${fmtP(Math.abs(qL), 1).replace("%", "")} pp</b> onde Lula já era forte e ${qF >= 0 ? "caiu" : "subiu"} <b>${fmtP(Math.abs(qF), 1).replace("%", "")} pp</b> onde Flávio era forte: `
+      + (lado ? `a mobilização foi maior em lugar pró-${lado}, o que ajudou <b>${lado}</b>.` : "a mobilização foi parecida nos dois lados.");
+  })() : "";
+  // países que mais mudaram de comparecimento
+  const ps = (c.paises || []).slice(0, 8);
+  const linhasP = ps.map((x) => {
+    const lado = x.lula_1t_pct >= 50 ? "l" : "f";
+    return `<tr><td><b>${marca(lado)}${esc(x.pais)}</b><small>${fmtN(x.secoes)} seções · Lula tinha ${fmtP(x.lula_1t_pct, 0)} no 1º t.</small></td>
+      <td>${fmtP(x.abst_1t, 1)} → <b>${fmtP(x.abst, 1)}</b><small>${fmtPPs(x.abst - x.abst_1t)} pp</small></td><td><b>${sinalN(x.d_comparecimento)}</b><small class="so-cel">votantes</small></td>
+      <td><b>${sinalN(x.lula)}</b><small class="so-cel">Lula</small></td><td><b>${sinalN(x.flavio)}</b><small class="so-cel">Flávio</small></td></tr>`;
+  }).join("");
+  return `<div class="xp-card cr">
+    <div class="rot">Por que cada um cresceu desde o 1º turno</div>
+    <div class="xp-sub">${fmtN(c.secoes)} seções que existem nos dois turnos · abstenção ${fmtP(c.abst_1t, 1)} → <b>${fmtP(c.abst, 1)}</b> · ${sinalN(D)} votantes · a 3ª via tinha ${fmtN(c.outros_1t)} votos</div>
+    <div class="cr-grade">
+      <div>
+        ${linha("Lula", "l", L)}${linha("Flávio", "f", F)}
+        <div class="cr-leg"><span><i class="s"></i>da 3ª via do 1º turno</span><span><i class="r"></i>${voltou}</span></div>
+        <p class="fl-frase">${frase}</p>
+      </div>
+      <div>
+        <div class="sub-h">Onde a abstenção caiu: em lugar pró ou anti-Lula?</div>
+        <table class="tabela cr-tab"><tbody>${linhasG}</tbody></table>
+        <div class="cr-leg"><span><i class="d0"></i>1º turno</span><span><i class="d1"></i>agora</span></div>
+        <p class="fl-frase">${fraseG}</p>
+      </div>
     </div>
-    <p class="fl-frase">Lula e Flávio somaram <b>+${fmtN(tot)}</b> votos. ${frase}</p>
-    <p class="xp-sub">É um balanço do total, não o caminho de cada eleitor: não dá para saber quem da 3ª via foi para quem.</p>
+    ${linhasP ? `<details class="cr-paises"><summary>Por país: onde mais gente passou a votar</summary>
+      <table class="tabela"><thead><tr><th>País (cor: quem venceu ali no 1º turno)</th><th>Abstenção</th><th>Votantes</th><th>Lula</th><th>Flávio</th></tr></thead><tbody>${linhasP}</tbody></table></details>` : ""}
+    <p class="xp-sub">Estimativa pelo padrão entre as seções (onde havia mais 3ª via, quanto cada um cresceu; onde mais gente voltou a votar, quanto cada um cresceu), não o voto de cada eleitor. Faixa de 80%: 3ª via para Lula ${fmtP(L.fatia_3via_faixa[0], 0)}–${fmtP(L.fatia_3via_faixa[1], 0)}; novos votantes para Lula ${fmtP(L.fatia_novos_faixa[0], 0)}–${fmtP(L.fatia_novos_faixa[1], 0)}.</p>
   </div>`;
 }
 
