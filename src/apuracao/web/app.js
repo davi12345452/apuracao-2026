@@ -33,7 +33,7 @@ const descFaixa = (f) => (f.de === 0 ? `Flávio com mais de ${100 - f.ate}% no 1
 const DICA = {
   validos: "Votos válidos: só os votos dados a Lula ou a Flávio. Brancos e nulos ficam de fora.",
   terceira: "3ª via: votos que, no 1º turno, foram para candidatos que não estão no 2º turno.",
-  voltam: "Eleitores que não votaram no 1º turno e votaram agora (ou o contrário, quando a abstenção sobe).",
+  voltam: "Votos válidos a mais que no 1º turno: quem se absteve ou votou branco ou nulo no 1º turno e agora votou num dos dois (ou o contrário, quando diminuem).",
   abstencao: "Abstenção: eleitores aptos que não foram votar.",
   faixa80: "Faixa provável: em 80% das simulações o resultado final ficou dentro dela.",
   projecao: "Estimativa do resultado final: os votos já contados mais o que se espera das urnas que faltam, lugar por lugar.",
@@ -89,7 +89,7 @@ function legenda(m) {
     return `<span class="escala"><span><i style="background:${COR("vazio")}"></i>0</span>${esc4("a", ["<25%", "<50%", "<100%", "100%"]).join("")}</span><span>das urnas apuradas</span>`;
   }
   if (m === "desvio") {
-    return `<span class="lado" style="color:var(--flavio)">Flávio acima</span><span class="escala">${esc4("f", ["6+", "3–6", "1–3", "0–1"]).reverse().join("")}${esc4("l", ["0–1", "1–3", "3–6", "6+"]).join("")}</span><span class="lado" style="color:var(--lula)">Lula acima</span><span>da ${comTip("base", DICA.base)}, em ${comTip("pp", DICA.pp)}</span>`;
+    return `<span class="lado" style="color:var(--flavio)">Flávio acima</span><span class="escala">${esc4("f", ["0–1", "1–3", "3–6", "6+"]).reverse().join("")}${esc4("l", ["0–1", "1–3", "3–6", "6+"]).join("")}</span><span class="lado" style="color:var(--lula)">Lula acima</span><span>da ${comTip("base", DICA.base)}, em ${comTip("pp", DICA.pp)}</span>`;
   }
   return `<span class="lado" style="color:var(--flavio)">Flávio</span><span class="escala">${esc4("f", ["50", "55", "60", "70+"]).reverse().join("")}${esc4("l", ["50", "55", "60", "70+"]).join("")}</span><span class="lado" style="color:var(--lula)">Lula</span><span>% dos ${comTip("votos válidos", DICA.validos)} de quem lidera</span>`;
 }
@@ -403,11 +403,11 @@ function aoVivoBrasil(est) {
   const itens = ents.slice(0, 7).map((e) => {
     const d = e.dif_1t?.lula_pp;
     return `<div class="av-i"><span class="h">${esc((e.hg || "").slice(0, 5))}</span>
-      <span class="o"><b>${esc(e.nome)}</b><small>${e.uf.toUpperCase()} · ${fmtN(e.secoes)} seções</small></span>
+      <span class="o"><b>${esc(e.nome)}</b><small>${e.uf.toUpperCase()} · ${fmtN(e.secoes)} ${e.secoes === 1 ? "seção" : "seções"}</small></span>
       <span class="d"><b class="${e.lula_pct >= 50 ? "l" : "f"}">${liderTxt(e.lula_pct, 0)}</b>${d == null ? "" : `<small>${fmtDelta(d, 1, true)} vs 1º t.</small>`}</span></div>`;
   }).join("");
   return `<h3>Ao vivo<span>TSE ${esc(lt.hg || "")}</span></h3>
-    <div class="av-lote"><span class="k">Último lote · ${fmtN(t.municipios)} municípios · ${fmtMi(t.validos)} válidos</span>
+    <div class="av-lote"><span class="k">Último lote · ${fmtN(t.municipios)} ${t.municipios === 1 ? "município" : "municípios"} · ${fmtMi(t.validos)} válidos</span>
       <span>${lider(t.lula_pct)} · ${fmtDelta(t.dif_pp, 1, true)} ${comTip("vs esperado", "Diferença entre o resultado do lote e o esperado para esses mesmos municípios pelo 1º turno, já com a divisão da 3ª via.")}</span></div>
     <div class="av-lista">${itens}</div>
     <p class="dica">vs 1º t.: quem ganhou terreno no município em relação ao 1º turno, em pontos percentuais.</p>
@@ -639,8 +639,8 @@ const fmtC = (x) => (Math.abs(x) >= 1e5 ? fmtMi(x) : fmtN(x));
 const sinalC = (d) => (d > 0 ? "+" : d < 0 ? "−" : "±") + fmtC(Math.abs(d));
 function cartaoCrescimento(c, pl) {
   if (!c || !c.candidatos) return "";
-  const L = c.candidatos.lula, F = c.candidatos.flavio, D = c.d_comparecimento, v22 = pl?.vs_2022;
-  const voltou = D >= 0 ? "de quem não tinha votado no 1º turno" : "de quem votou no 1º turno e não voltou";
+  const L = c.candidatos.lula, F = c.candidatos.flavio, D = c.d_validos_novos ?? c.d_comparecimento, v22 = pl?.vs_2022;
+  const voltou = D >= 0 ? "de quem não votou em ninguém no 1º turno" : "de quem votou no 1º turno e não voltou";
   const escala = Math.max(1, ...[L, F].map((x) => Math.max(0, x.da_3via) + Math.max(0, x.do_comparecimento)));
   const linha = (nome, lado, x) => `<div class="cr-l">
       <span class="cr-n">${marca(lado)}${nome}</span><b class="cr-g">${sinalC(x.ganho)}</b>
@@ -648,16 +648,16 @@ function cartaoCrescimento(c, pl) {
         <i class="s ${lado}" style="width:${(100 * Math.max(0, x.da_3via)) / escala}%" data-tip="da 3ª via: ~${fmtC(x.da_3via)}"></i>
         <i class="r ${lado}" style="width:${(100 * Math.max(0, x.do_comparecimento)) / escala}%" data-tip="${voltou}: ~${fmtC(x.do_comparecimento)}"></i>
       </div>
-      <span class="cr-p"><b>~${fmtC(x.da_3via)}</b> da 3ª via · <b>~${fmtC(x.do_comparecimento)}</b> ${D >= 0 ? "de quem voltou a votar" : "de quem deixou de votar"}</span>
+      <span class="cr-p"><b>~${fmtC(x.da_3via)}</b> da 3ª via · <b>~${fmtC(x.do_comparecimento)}</b> ${D >= 0 ? "de quem passou a votar em alguém" : "de quem deixou de votar"}</span>
     </div>`;
   const pp = (a, b) => (a == null || b == null ? null : a - b);
   const saldoAbst = L.do_comparecimento - F.do_comparecimento, saldo3 = L.da_3via - F.da_3via;
   const quem = (v) => (v >= 0 ? "Lula" : "Flávio");
-  const fonte = (x) => (x.do_comparecimento > x.da_3via ? "com quem não tinha votado no 1º turno" : "com a 3ª via");
-  const frase = `<b>Lula</b> cresceu mais ${fonte(L)}; <b>Flávio</b>, ${fonte(F)}.
-    Dos eleitores que ${D >= 0 ? "passaram a votar" : "deixaram de votar"}, cerca de <b>${fmtP(L.fatia_novos, 0)}</b> ${D >= 0 ? "foram para" : "eram de"} Lula e <b>${fmtP(F.fatia_novos, 0)}</b> ${D >= 0 ? "para" : "de"} Flávio.
+  const fonte = (x) => (x.do_comparecimento > x.da_3via ? "com quem não tinha votado em ninguém no 1º turno" : "com a 3ª via");
+  const frase = `${fonte(L) === fonte(F) ? `Os dois cresceram mais ${fonte(L)}.` : `<b>Lula</b> cresceu mais ${fonte(L)}; <b>Flávio</b>, ${fonte(F)}.`}
+    Dos eleitores que ${D >= 0 ? "passaram a votar em alguém (antes se abstiveram ou votaram branco ou nulo)" : "deixaram de votar"}, cerca de <b>${fmtP(L.fatia_novos, 0)}</b> ${D >= 0 ? "foram para" : "eram de"} Lula e <b>${fmtP(F.fatia_novos, 0)}</b> ${D >= 0 ? "para" : "de"} Flávio.
     Da 3ª via, cerca de <b>${fmtP(L.fatia_3via, 0)}</b> foi para Lula e <b>${fmtP(F.fatia_3via, 0)}</b> para Flávio.
-    No saldo, a mudança na abstenção deu <b>${quem(saldoAbst)} +${fmtC(Math.abs(saldoAbst))}</b> votos de vantagem e a 3ª via deu <b>${quem(saldo3)} +${fmtC(Math.abs(saldo3))}</b>.`;
+    No saldo, os votos válidos novos deram <b>${quem(saldoAbst)} +${fmtC(Math.abs(saldoAbst))}</b> votos de vantagem e a 3ª via deu <b>${quem(saldo3)} +${fmtC(Math.abs(saldo3))}</b>.`;
   // onde a abstenção caiu
   const gs = c.grupos || [];
   const vals = gs.flatMap((g) => [g.abst_1t, g.abst]).filter((v) => v != null);
@@ -686,7 +686,7 @@ function cartaoCrescimento(c, pl) {
   }).join("");
   return `<div class="xp-card cr">
     <div class="rot">Por que cada um cresceu desde o 1º turno ${ajuda("Compara cada lugar com ele mesmo no 1º turno e separa o crescimento de cada candidato em duas fontes: votos que eram da 3ª via e votos de quem passou a votar (ou deixou de votar).")}</div>
-    <div class="xp-sub">${c.unidade === "seções" ? `${fmtN(c.unidades)} seções que existem nos dois turnos` : `${fmtN(c.unidades)} municípios com ${fmtP(100 * c.min_frac, 0)} ou mais apurado (${fmtP(c.eleitorado_pct, 0)} do eleitorado), contra o 1º turno nas mesmas urnas`} · abstenção ${fmtP(c.abst_1t, 1)} → <b>${fmtP(c.abst, 1)}</b> · ${sinalC(D)} votantes · a 3ª via tinha ${fmtC(c.outros_1t)} votos</div>
+    <div class="xp-sub">${c.unidade === "seções" ? `${fmtN(c.unidades)} seções que existem nos dois turnos` : `${fmtN(c.unidades)} municípios com ${fmtP(100 * c.min_frac, 0)} ou mais apurado (${fmtP(c.eleitorado_pct, 0)} do eleitorado), contra o 1º turno nas mesmas urnas`} · abstenção ${fmtP(c.abst_1t, 1)} → <b>${fmtP(c.abst, 1)}</b> · ${sinalC(c.d_comparecimento)} votantes e ${sinalC(D)} votos válidos · a 3ª via tinha ${fmtC(c.outros_1t)} votos</div>
     ${v22 && v22.secoes ? `<div class="xp-sub">Contra o 2º turno de 2022, nas ${fmtN(v22.secoes)} seções que já existiam: Lula <b>${sinalC(v22.lula - v22.lula_antes)}</b>, Flávio <b>${sinalC(v22.flavio - v22.flavio_antes)}</b> em relação a Bolsonaro, comparecimento <b>${sinalC(v22.comparecimento - v22.comparecimento_antes)}</b>.</div>` : ""}
     <div class="cr-grade">
       <div>
@@ -703,7 +703,7 @@ function cartaoCrescimento(c, pl) {
     </div>
     ${linhasP ? `<details class="cr-paises"><summary>Por ${c.tipo_lugar}: onde o comparecimento mais mudou</summary>
       <table class="tabela"><thead><tr><th>${c.tipo_lugar === "país" ? "País" : "Estado"} (cor: quem venceu ali no 1º turno)</th><th>Abstenção</th><th>Votantes</th><th>Lula</th><th>Flávio</th></tr></thead><tbody>${linhasP}</tbody></table></details>` : ""}
-    <p class="xp-sub">Estimativa feita comparando ${c.unidade === "seções" ? "as seções" : "os municípios"} entre si: onde havia mais 3ª via, ou onde mais gente voltou a votar, quanto cada um cresceu. O voto de cada eleitor é secreto; isto é o padrão do conjunto. Faixa provável: da 3ª via, Lula ${fmtP(L.fatia_3via_faixa[0], 0)}–${fmtP(L.fatia_3via_faixa[1], 0)} e Flávio ${fmtP(F.fatia_3via_faixa[0], 0)}–${fmtP(F.fatia_3via_faixa[1], 0)}; de quem voltou a votar, Lula ${fmtP(L.fatia_novos_faixa[0], 0)}–${fmtP(L.fatia_novos_faixa[1], 0)} e Flávio ${fmtP(F.fatia_novos_faixa[0], 0)}–${fmtP(F.fatia_novos_faixa[1], 0)}.</p>
+    <p class="xp-sub">Estimativa feita comparando ${c.unidade === "seções" ? "as seções" : "os municípios"} entre si: onde havia mais 3ª via, ou onde mais gente passou a votar em alguém, quanto cada um cresceu. O voto de cada eleitor é secreto; isto é o padrão do conjunto. Faixa provável: da 3ª via, Lula ${fmtP(L.fatia_3via_faixa[0], 0)}–${fmtP(L.fatia_3via_faixa[1], 0)} e Flávio ${fmtP(F.fatia_3via_faixa[0], 0)}–${fmtP(F.fatia_3via_faixa[1], 0)}; de quem passou a votar em alguém, Lula ${fmtP(L.fatia_novos_faixa[0], 0)}–${fmtP(L.fatia_novos_faixa[1], 0)} e Flávio ${fmtP(F.fatia_novos_faixa[0], 0)}–${fmtP(F.fatia_novos_faixa[1], 0)}.</p>
   </div>`;
 }
 
@@ -831,10 +831,10 @@ function cartaoCenario(c, apurando) {
       <p class="fl-frase">Cada município recebe as proporções que o exterior mede para a faixa dele no 1º turno: quanto da 3ª via e de quem volta a votar vai para cada um.
         A variação do comparecimento é a do próprio município entre o 1º e o 2º turno de 2022, porque a do exterior parte de uma abstenção muito diferente.</p>
     </div>
-    <div class="sub-h">O que o exterior está mostrando ${ajuda("Seções do exterior agrupadas pelo resultado do 1º turno. Em cada grupo, a divisão estimada dos votos da 3ª via e de quem voltou a votar. Grupos com poucas seções ficam mais perto da média geral.")}</div>
+    <div class="sub-h">O que o exterior está mostrando ${ajuda("Seções do exterior agrupadas pelo resultado do 1º turno. Em cada grupo, a divisão estimada dos votos da 3ª via e de quem passou a votar em alguém. Grupos com poucas seções ficam mais perto da média geral.")}</div>
     <table class="tabela cr-tab cen-var"><tbody>${faixas}</tbody></table>
     <div class="sub-h" style="margin-top:14px">Região por região</div>
-    <div class="tabela-wrap"><table class="tabela br-t cen-t"><thead><tr><th>Região</th>${th("1º turno*", "Resultado do 1º turno de 2026, só entre os dois.")}${th("Cenário", "Resultado se a região repetisse o comportamento do exterior. Embaixo, quem ganha terreno em relação ao 1º turno.")}${th("Lula ganha", "Votos que Lula ganha no cenário: da 3ª via e da mudança no comparecimento.")}${th("Flávio ganha", "Votos que Flávio ganha no cenário: da 3ª via e da mudança no comparecimento.")}${th("Abstenção", "Abstenção no 1º turno → no cenário, pela variação de 2022.")}${apurando ? th("Medido agora*", "O que os municípios da região com 90% ou mais apurado estão mostrando de fato.") : ""}</tr></thead>
+    <div class="tabela-wrap"><table class="tabela br-t cen-t"><thead><tr><th>Região</th>${th("1º turno*", "Resultado do 1º turno de 2026, só entre os dois.")}${th("Cenário", "Resultado se a região repetisse o comportamento do exterior. Embaixo, quem ganha terreno em relação ao 1º turno.")}${th("Lula ganha", "Votos que Lula ganha no cenário: da 3ª via e de quem passou a votar em alguém (mudança no comparecimento e brancos e nulos que viraram voto).")}${th("Flávio ganha", "Votos que Flávio ganha no cenário: da 3ª via e de quem passou a votar em alguém (mudança no comparecimento e brancos e nulos que viraram voto).")}${th("Abstenção", "Abstenção no 1º turno → no cenário, pela variação de 2022.")}${apurando ? th("Medido agora*", "O que os municípios da região com 90% ou mais apurado estão mostrando de fato.") : ""}</tr></thead>
       <tbody>${linhas}</tbody></table></div>
     <p class="nota-leitura">* Só os votos dos dois. ${apurando ? "Medido agora: municípios com 90% ou mais apurado na região, comparados com o 1º turno deles. " : ""}O eleitor do exterior é diferente do eleitor do Brasil: o cenário mostra o que aconteceria se cada tipo de lugar repetisse o exterior. Não é previsão. Clique numa região para abrir os estados.</p>
   </section>`;

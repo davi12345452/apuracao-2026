@@ -397,14 +397,20 @@ GRUPOS_1T = [(0, 40, "Flávio forte", "f"), (40, 50, "Flávio leve", "f"), (50, 
 def _decompor(L2, F2, C2, A2, B2, L1, F1, C1, A1, B1, lugar: np.ndarray, iso: dict, n_boot: int = 300) -> dict:
     """Por que cada um cresceu desde o 1º turno, unidade a unidade (seção no exterior, município no Brasil).
 
-    Decomposição ecológica: votos ganhos por apto = a·(3ª via do 1º turno por apto) + b·(variação do
-    comparecimento por apto), mínimos quadrados ponderados pelos aptos. a é a fatia da 3ª via que foi para o
-    candidato; b, a fatia de quem passou a votar (ou deixou de votar, se negativo). Estimativa pelo padrão
-    entre unidades, não o voto de cada eleitor. Faixa: bootstrap das unidades (p10–p90).
+    Decomposição ecológica (regressão de Goodman): votos ganhos por apto = a·(3ª via do 1º turno por apto)
+    + b·(votos válidos novos por apto), mínimos quadrados ponderados pelos aptos. Votos válidos novos =
+    Δcomparecimento − Δbrancos/nulos: quem passou a votar em alguém (antes se absteve ou votou branco/nulo),
+    ou deixou de votar, se negativo. a é a fatia da 3ª via que foi para o candidato; b, a dos válidos novos.
+    Em cada unidade vale a identidade ΔLula + ΔFlávio = 3ª via + válidos novos; como o ajuste é linear, os
+    coeficientes de Lula e de Flávio somam exatamente 1 em cada canal. Usar só Δcomparecimento deixava a queda
+    de brancos e nulos sem canal (ela ia para a 3ª via e as fatias passavam de 100% somadas); separá-la num
+    terceiro canal dá coeficientes fora de [0, 1] por colinearidade.
+    Estimativa pelo padrão entre unidades, não o voto de cada eleitor. Faixa: bootstrap das unidades (p10–p90).
     Também agrupa as unidades pela inclinação no 1º turno (a abstenção caiu em lugar pró ou anti Lula?)
     e por lugar (país ou UF)."""
-    O1, dL, dF, dC = C1 - L1 - F1 - B1, L2 - L1, F2 - F1, C2 - C1
-    Z = np.c_[O1 / A1, dC / A1]
+    O1, dL, dF, dC, dB = C1 - L1 - F1 - B1, L2 - L1, F2 - F1, C2 - C1, B2 - B1
+    dV = dC - dB  # votos válidos novos
+    Z = np.c_[O1 / A1, dV / A1]
     w = np.sqrt(A1)
 
     def ajuste(idx):
@@ -418,11 +424,12 @@ def _decompor(L2, F2, C2, A2, B2, L1, F1, C1, A1, B1, lugar: np.ndarray, iso: di
     coef = ajuste(np.arange(n))
     rng = np.random.default_rng(7)
     boot = [ajuste(rng.integers(0, n, n)) for _ in range(n_boot)]
-    O, D = O1.sum(), dC.sum()
+    O, D = O1.sum(), dV.sum()
     cand = {}
     for nome, d in (("lula", dL), ("flavio", dF)):
         a, b = coef[nome]
         ba = np.array([c[nome][0] for c in boot]); bb = np.array([c[nome][1] for c in boot])
+        # "do_comparecimento" guarda os válidos novos (comparecimento + brancos/nulos que viraram voto)
         cand[nome] = {"ganho": int(round(d.sum())), "da_3via": int(round(a * O)), "do_comparecimento": int(round(b * D)),
                       "fatia_3via": _r(100 * a), "fatia_3via_faixa": [_r(100 * np.percentile(ba, 10)), _r(100 * np.percentile(ba, 90))],
                       "fatia_novos": _r(100 * b), "fatia_novos_faixa": [_r(100 * np.percentile(bb, 10)), _r(100 * np.percentile(bb, 90))]}
@@ -443,7 +450,7 @@ def _decompor(L2, F2, C2, A2, B2, L1, F1, C1, A1, B1, lugar: np.ndarray, iso: di
             grupos.append({"nome": nome, "lado": lado, "de": lo, "ate": min(hi, 100), **resumo(m)})
     lugares = [{"lugar": str(x), "iso3": iso.get(str(x)) or "", **resumo(lugar == x)} for x in set(lugar.tolist())]
     lugares = sorted((x for x in lugares if x["unidades"] >= 3), key=lambda x: -abs(x["d_comparecimento"]))
-    return {"unidades": n, "outros_1t": int(round(O)), "d_comparecimento": int(round(D)), "d_brancos_nulos": int(round((B2 - B1).sum())),
+    return {"unidades": n, "outros_1t": int(round(O)), "d_comparecimento": int(round(dC.sum())), "d_validos_novos": int(round(D)), "d_brancos_nulos": int(round((B2 - B1).sum())),
             "abst_1t": _pct(A1.sum() - C1.sum(), A1.sum()), "abst": _pct(A2.sum() - C2.sum(), A2.sum()),
             "candidatos": cand, "grupos": grupos, "lugares": lugares}
 
@@ -505,12 +512,13 @@ def variaveis_exterior(ctx: Ctx) -> dict | None:
     if len(pares) < 40:
         return None
     X = np.array([[r["lula"], r["flavio"], r["comparecimento"], s["lula"], s["flavio"], s["comparecimento"], s["aptos"],
-                   s["brancos"] + s["nulos"]] for r, s in pares], float)
-    L2, F2, C2, L1, F1, C1, A1, B1 = X.T
+                   s["brancos"] + s["nulos"], r["brancos"] + r["nulos"]] for r, s in pares], float)
+    L2, F2, C2, L1, F1, C1, A1, B1, B2 = X.T
     O1 = C1 - L1 - F1 - B1
-    Z = np.c_[O1 / A1, (C2 - C1) / A1] * np.sqrt(A1)[:, None]
+    # mesmos canais de _decompor: 3ª via e válidos novos (comparecimento + brancos/nulos que viraram voto)
+    Z = np.c_[O1 / A1, ((C2 - C1) - (B2 - B1)) / A1] * np.sqrt(A1)[:, None]
     Y = np.c_[(L2 - L1) / A1, (F2 - F1) / A1] * np.sqrt(A1)[:, None]
-    glob = np.linalg.lstsq(Z, Y, rcond=None)[0]  # 2×2: linhas 3ª via / novos, colunas Lula / Flávio
+    glob = np.linalg.lstsq(Z, Y, rcond=None)[0]  # 2×2: linhas 3ª via / válidos novos, colunas Lula / Flávio
     incl = 100 * L1 / np.maximum(L1 + F1, 1)
     faixas = []
     for lo, hi, nome, lado in GRUPOS_1T:
@@ -534,13 +542,20 @@ def cenario_brasil(ctx: Ctx, var: dict, u: Unidades | None = None) -> dict:
     r_nac = a2["comparecimento"][m & ok22].sum() / a1["comparecimento"][m & ok22].sum()
     r22 = np.where(ok22, a2["comparecimento"] / np.where(ok22, a1["comparecimento"], 1), r_nac)
     dC = np.where(m, C1 * (r22 - 1), 0.0)
+    # brancos e nulos que viram voto: a fração do 1º turno que sumiu no 2º turno de 2022 no mesmo município
+    bn1, bn21, bn22 = C1 - b1["validos"], a1["comparecimento"] - a1["validos"], a2["comparecimento"] - a2["validos"]
+    okb = ok22 & (bn21 > 0)
+    q_nac = 1 - bn22[m & okb].sum() / bn21[m & okb].sum()
+    q22 = np.where(okb, 1 - bn22 / np.where(okb, bn21, 1), q_nac)
+    dBN = np.where(m, np.maximum(bn1, 0) * np.clip(q22, -1, 1), 0.0)
     incl = 100 * L1 / np.maximum(L1 + F1, 1)
     dL3, dLn, dF3, dFn = (np.zeros(len(L1)) for _ in range(4))
     for f in var["faixas"]:
         g = m & (incl >= f["de"]) & ((incl < f["ate"]) if f["ate"] < 100 else True)
         c = f["c"]
         dL3[g], dF3[g] = c[0, 0] * O1[g], c[0, 1] * O1[g]
-        dLn[g], dFn[g] = c[1, 0] * dC[g], c[1, 1] * dC[g]
+        # válidos novos: quem passou a votar e os brancos/nulos que viraram voto
+        dLn[g], dFn[g] = c[1, 0] * (dC[g] + dBN[g]), c[1, 1] * (dC[g] + dBN[g])
     L2, F2 = np.maximum(L1 + dL3 + dLn, 0), np.maximum(F1 + dF3 + dFn, 0)
     medido = None
     if u is not None:
