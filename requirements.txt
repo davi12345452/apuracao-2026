@@ -1,4 +1,4 @@
-# imagem Docker (no Mac: pip install -e . com o analise-urnas vizinho)
+# dependências (o analise_urnas vem copiado em vendor/; use PYTHONPATH=src:vendor)
 numpy==2.5.4
 requests==2.34.2
 urllib3==2.8.0

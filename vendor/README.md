@@ -1,3 +1,3 @@
-Cópia mínima do `analise_urnas` (repo davi12345452/analise-urnas) usada só na imagem Docker:
-cliente HTTP, zip remoto, parser de BU e as specs ASN.1. No Mac o pacote continua instalado
-a partir do repo vizinho (`pip install -e`); a imagem usa esta cópia via PYTHONPATH.
+Cópia mínima do `analise_urnas`: cliente HTTP com ritmo controlado, leitura de zip remoto por Range,
+parser dos boletins de urna (BU) e as especificações ASN.1 publicadas pelo TSE (`specs/`).
+O projeto a usa via `PYTHONPATH=src:vendor` e `ANALISE_URNAS_SPECS_DIR=vendor/specs`.

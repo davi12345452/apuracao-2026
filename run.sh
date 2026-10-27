@@ -1,6 +1,7 @@
 #!/bin/zsh
 # Liga/desliga o vigia, que sobe e supervisiona coletor e painel. Uso: ./run.sh [start|stop|status]
 cd "${0:A:h}"
+export PYTHONPATH=src:vendor ANALISE_URNAS_SPECS_DIR=vendor/specs
 parar() {
   for p in vigia coletor server; do
     [ -f data/$p.pid ] && kill $(cat data/$p.pid) 2>/dev/null; rm -f data/$p.pid

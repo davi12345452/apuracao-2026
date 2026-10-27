@@ -1,9 +1,10 @@
 [project]
 name = "apuracao-2026"
 version = "0.1.0"
-description = "Painel local da apuração do 2º turno presidencial de 2026 (exterior ao vivo, abstenção, projeções)"
+description = "Painel ao vivo da apuração do 2º turno presidencial de 2026: coleta do TSE, projeção e análises"
 requires-python = ">=3.11"
-dependencies = ["analise-urnas", "requests>=2.31"]
+# analise_urnas vem copiado em vendor/ (PYTHONPATH=src:vendor); versões fixas em requirements.txt
+dependencies = ["numpy>=2", "requests>=2.31", "asn1tools>=0.166"]
 
 [build-system]
 requires = ["setuptools>=77"]
@@ -14,4 +15,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["src"]
+pythonpath = ["src", "vendor"]

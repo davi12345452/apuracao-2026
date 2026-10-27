@@ -1,8 +1,8 @@
-"""Avisos no Telegram nos marcos da noite (opcionais).
+"""Avisos opcionais no Telegram nos marcos da noite (liga com APURACAO_ALERTAS=1).
 
 Cada aviso tem uma chave e sai uma vez só (tabela alerta). Viradas usam o último lado avisado
-(tabela alerta_estado). O token vem de APURACAO_TG_TOKEN ou da config do OpenClaw; o chat, de
-APURACAO_TG_CHAT ou data/alertas.json. Nada disso vai para o repositório.
+(tabela alerta_estado). O token vem de APURACAO_TG_TOKEN; o chat, de APURACAO_TG_CHAT ou
+data/alertas.json. Nada disso vai para o repositório.
 """
 
 from __future__ import annotations
@@ -25,12 +25,6 @@ MOV_MERCADO_PP = 5.0  # chance média dos mercados andando isso em 30 min
 
 def _config() -> tuple[str | None, str | None]:
     token = os.environ.get("APURACAO_TG_TOKEN")
-    if not token:
-        try:
-            cfg = json.loads(Path("~/.openclaw/openclaw.json").expanduser().read_text())
-            token = cfg["channels"]["telegram"]["botToken"]
-        except Exception:  # noqa: BLE001 - sem token, sem aviso
-            token = None
     chat = os.environ.get("APURACAO_TG_CHAT")
     if not chat:
         try:
