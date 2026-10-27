@@ -232,3 +232,8 @@ O painel ficou aberto na internet durante a noite, então passou por duas revis�
 
 Nenhum segredo está no repositório. Os avisos por Telegram (`alertas.py`) são opcionais e só ligam com
 `APURACAO_ALERTAS=1` e token e chat em variáveis de ambiente.
+
+## Licença
+
+[MIT](LICENSE). Os dados são públicos e pertencem às fontes listadas acima (TSE, IBGE, Natural Earth, Polymarket,
+Kalshi).

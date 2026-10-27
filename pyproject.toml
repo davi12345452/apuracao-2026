@@ -3,6 +3,7 @@ name = "apuracao-2026"
 version = "0.1.0"
 description = "Painel ao vivo da apuração do 2º turno presidencial de 2026: coleta do TSE, projeção e análises"
 requires-python = ">=3.11"
+license = "MIT"
 # analise_urnas vem copiado em vendor/ (PYTHONPATH=src:vendor); versões fixas em requirements.txt
 dependencies = ["numpy>=2", "requests>=2.31", "asn1tools>=0.166"]
 
